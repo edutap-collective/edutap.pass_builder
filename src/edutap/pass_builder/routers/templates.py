@@ -10,6 +10,7 @@ from ..auth import AuthContext, require
 from ..dependencies import get_credential_service, get_template_service
 from ..errors import ProblemError
 from ..models.api import (
+    AssetResponse,
     CreateGoogleVersionRequest,
     CreateTemplateRequest,
     CreateVariantRequest,
@@ -351,14 +352,14 @@ async def get_asset(
     return Response(content=data, media_type=_asset_media_type(asset))
 
 
-@router.put("/versions/{version_id}/assets/{filename}")
+@router.put("/versions/{version_id}/assets/{filename}", response_model=AssetResponse)
 async def put_asset(
     version_id: UUID,
     filename: str,
     request: Request,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     templates: TemplateService = Depends(get_template_service),  # noqa: B008
-) -> dict[str, Any]:
+) -> AssetResponse:
     """Replace one draft version's asset. `409` once the version is published."""
     content_type = request.headers.get("content-type", "")
     if content_type.startswith("multipart/form-data"):
@@ -374,12 +375,13 @@ async def put_asset(
     asset = await templates.put_asset(
         auth.tenant_id, version_id, filename, data, media_type
     )
-    return {
-        "filename": asset.filename,
-        "media_type": asset.media_type,
-        "size": asset.size,
-        "sha256": asset.sha256,
-    }
+    return AssetResponse(
+        filename=asset.filename,
+        media_type=asset.media_type,
+        size=asset.size,
+        sha256=asset.sha256,
+        created_at=asset.created_at,
+    )
 
 
 @router.delete("/versions/{version_id}/assets/{filename}", status_code=204)
