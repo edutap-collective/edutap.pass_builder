@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import AuthContext
 from ..errors import ProblemError
-from ..services.audit import elapsed_ms, write_audit
+from ..services.audit import elapsed_ms, write_audit_durable
 
 
 class audited:
@@ -28,10 +28,13 @@ class audited:
     `outcome="success"` entry afterwards, since it commonly needs values
     only available once the wrapped call has returned (the created row, a
     freshly resolved variant, ...). On failure this writes the
-    `outcome="error"` entry itself, in the same session, and never
-    swallows a failure of that write -- it is allowed to propagate, same
-    as `_render`. A `ProblemError` keeps its `slug` as `error_code` and is
-    re-raised unchanged; any other exception is reported as a generic
+    `outcome="error"` entry itself, durably (see
+    `services/audit.py::write_audit_durable`) so it survives the request
+    session's rollback in `database.get_session` once the exception below
+    finishes propagating, and never swallows a failure of that write -- it
+    is allowed to propagate, same as `_render`. A `ProblemError` keeps its
+    `slug` as `error_code` and is re-raised unchanged; any other exception
+    is reported as a generic
     `internal_error` (the original message is never audited or surfaced,
     it could carry secret material) and re-raised as
     `ProblemError(500, "internal_error", ...)`.
@@ -82,7 +85,7 @@ class audited:
         if exc is None:
             return False
         error_code = exc.slug if isinstance(exc, ProblemError) else "internal_error"
-        await write_audit(
+        await write_audit_durable(
             self._session,
             tenant_id=self._auth.tenant_id,
             request_id=self._request.headers.get("x-request-id") or "",

@@ -28,15 +28,20 @@ class ProblemError(Exception):
         self.extra = extra
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the problem document body."""
-        body: dict[str, Any] = {
-            "type": f"{PROBLEM_TYPE_PREFIX}{self.slug}",
-            "title": self.title,
-            "status": self.status,
-        }
+        """Return the problem document body.
+
+        `extra` is applied *first* and the RFC 9457 fields (`type`,
+        `title`, `status`, `detail`) *last*, so a caller-supplied `**extra`
+        key that happens to share one of those names (a `fields=...` or
+        `findings=...` payload could plausibly also carry a `status`, say)
+        can never overwrite them -- the reserved fields always win.
+        """
+        body: dict[str, Any] = dict(self.extra)
+        body["type"] = f"{PROBLEM_TYPE_PREFIX}{self.slug}"
+        body["title"] = self.title
+        body["status"] = self.status
         if self.detail is not None:
             body["detail"] = self.detail
-        body.update(self.extra)
         return body
 
 

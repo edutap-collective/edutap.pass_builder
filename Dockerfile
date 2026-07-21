@@ -10,6 +10,8 @@ RUN useradd --create-home --uid 10001 app
 COPY --from=build /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=build /usr/local/bin /usr/local/bin
 COPY assets /app/assets
+COPY migrations /app/migrations
+COPY alembic.ini /app/alembic.ini
 WORKDIR /app
 USER app
 EXPOSE 8000

@@ -589,6 +589,132 @@ async def test_preview_uses_provided_sample_data_over_placeholder(render_env):
     assert value == "Grace Hopper"
 
 
+async def test_preview_does_not_mutate_the_stored_pass_json(render_env):
+    """`preview` must never leave its bound values in the stored `pass_json`.
+
+    `apply_apple`'s `_set_field` mutates the field dict it finds by key in
+    place; a shallow `dict(spec.pass_json)` copy still shares those nested
+    field dicts with the ORM-managed `TemplateVersion.pass_json`, so a
+    naive preview would silently corrupt the persisted template the next
+    time it is rendered or previewed, not just this call's own result.
+    """
+    env = render_env
+
+    await env.service.preview(
+        env.auth,
+        template_key="student-id",
+        wallet_type=WalletType.APPLE,
+        variant_key=None,
+        version_number=None,
+        sample_data={"person.name": "Grace Hopper"},
+    )
+
+    query = select(TemplateVersion).where(
+        TemplateVersion.status  # ty: ignore[invalid-argument-type]
+        == VersionStatus.PUBLISHED
+    )
+    version = (await env.session.execute(query)).scalar_one()
+    stored_value = version.pass_json["generic"]["primaryFields"][0]["value"]
+    assert stored_value == "", (
+        "preview must not mutate the version's stored pass_json in place"
+    )
+
+
+# --- NFC payload length -------------------------------------------------------
+
+
+async def test_apple_nfc_payload_too_long_returns_422_and_is_audited(session):
+    """An NFC payload over 64 chars is a 422 `nfc_payload_too_long`, not a 500.
+
+    `engine.apple_apply.apply_apple` raises `NfcPayloadTooLongError` (a
+    plain exception) once a bound NFC payload exceeds the 64 character
+    limit (spec section 6); `RenderService._build_and_deliver` must
+    translate that into `ProblemError(422, "nfc_payload_too_long")` rather
+    than letting it fall through to the generic 500 handling, and the
+    failure must still be audited.
+    """
+    tenant, api_client = await _seed_tenant_and_client(session)
+    template = Template(tenant_id=tenant.id, key="nfc-id", name="NFC ID")
+    session.add(template)
+    await session.flush()
+
+    variant = TemplateVariant(
+        template_id=template.id,
+        wallet_type=WalletType.APPLE,
+        key="student",
+        name="Student",
+        is_default=True,
+    )
+    session.add(variant)
+    await session.flush()
+
+    version = TemplateVersion(
+        variant_id=variant.id,
+        number=1,
+        status=VersionStatus.PUBLISHED,
+        pass_json={
+            "formatVersion": 1,
+            "description": "NFC ID",
+            "organizationName": "Test Org",
+            "passTypeIdentifier": "pass.test.example",
+            "teamIdentifier": "TEAMID123",
+            "generic": {},
+        },
+    )
+    session.add(version)
+    await session.flush()
+
+    session.add(
+        DataField(key="person.nfc_code", value_type=ValueType.TEXT, label="NFC")
+    )
+    session.add(
+        MappingRule(
+            version_id=version.id,
+            origin=RuleOrigin.AUTHORED,
+            target_kind=TargetKind.NFC_PAYLOAD,
+            target="nfc",
+            source_field="person.nfc_code",
+            value_type=ValueType.TEXT,
+            required=True,
+            position=0,
+        )
+    )
+    await session.flush()
+
+    long_payload = "x" * 65
+    objectstore = FakeObjectStore()
+    data_provider = FakeDataProvider(response={"person.nfc_code": long_payload})
+    service = _make_service(session, objectstore, data_provider)
+    auth = AuthContext(
+        client_id=api_client.id, tenant_id=tenant.id, scopes={Scope.RENDER}
+    )
+
+    with pytest.raises(ProblemError) as excinfo:
+        await service.create_pass(
+            auth,
+            pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
+            template_key="nfc-id",
+            wallet_type=WalletType.APPLE,
+            variant_key=None,
+            person_uid="u1",
+            version_number=None,
+        )
+
+    assert excinfo.value.status == 422
+    assert excinfo.value.slug == "nfc_payload_too_long"
+    assert long_payload not in (excinfo.value.detail or "")
+
+    query = (
+        select(AuditLog)
+        .where(AuditLog.tenant_id == tenant.id)  # ty: ignore[invalid-argument-type]
+        .order_by(AuditLog.ts)  # ty: ignore[invalid-argument-type]
+    )
+    entries = list((await session.execute(query)).scalars().all())
+    last = entries[-1]
+    assert last.outcome == "error"
+    assert last.error_code == "nfc_payload_too_long"
+
+
 # --- unexpected failures / tenant-scoped credentials --------------------------
 
 

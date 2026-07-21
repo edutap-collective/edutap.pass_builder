@@ -501,4 +501,95 @@ async def test_build_render_spec_no_published_version_is_404(
             version_number=None,
         )
     assert excinfo.value.status == 404
-    assert excinfo.value.slug == "version_not_found"
+
+
+# --- credential_set_id tenant scoping on variant create/update ---------------
+
+
+async def test_create_variant_rejects_another_tenants_credential_set(
+    session, objectstore
+):
+    """Assigning another tenant's `credential_set_id` on create is a 404.
+
+    Rendering already fails closed on a mismatched `credential_set_id`
+    (`RenderService._load_credential_set`); this hardens the write path
+    too, so a stale or foreign id is rejected the moment it is assigned,
+    rather than only discovered at render time.
+    """
+    owner = Tenant(key="owner", name="Owner")
+    other = Tenant(key="other-cred-owner", name="Other")
+    session.add(owner)
+    session.add(other)
+    await session.flush()
+    template = Template(tenant_id=owner.id, key="student-id", name="Student ID")
+    session.add(template)
+    await session.flush()
+    foreign_credential = CredentialSet(
+        tenant_id=other.id, provider=Provider.APPLE, label="foreign"
+    )
+    session.add(foreign_credential)
+    await session.flush()
+
+    svc = TemplateService(session, objectstore)
+    with pytest.raises(ProblemError) as excinfo:
+        await svc.create_variant(
+            owner.id,
+            template.id,
+            key="student",
+            name="Student",
+            wallet_type=WalletType.APPLE,
+            is_default=True,
+            credential_set_id=foreign_credential.id,
+            google_class_id=None,
+        )
+    assert excinfo.value.status == 404
+    assert excinfo.value.slug == "credential_not_found"
+
+
+async def test_update_variant_rejects_another_tenants_credential_set(
+    session, objectstore, tenant_variant
+):
+    """Assigning another tenant's `credential_set_id` on update is a 404."""
+    other = Tenant(key="other-cred-owner-2", name="Other")
+    session.add(other)
+    await session.flush()
+    foreign_credential = CredentialSet(
+        tenant_id=other.id, provider=Provider.APPLE, label="foreign"
+    )
+    session.add(foreign_credential)
+    await session.flush()
+
+    svc = TemplateService(session, objectstore)
+    with pytest.raises(ProblemError) as excinfo:
+        await svc.update_variant(
+            tenant_variant.tenant_id,
+            tenant_variant.variant_id,
+            name=None,
+            is_default=None,
+            credential_set_id=foreign_credential.id,
+            google_class_id=None,
+        )
+    assert excinfo.value.status == 404
+    assert excinfo.value.slug == "credential_not_found"
+
+
+async def test_update_variant_accepts_own_tenants_credential_set(
+    session, objectstore, tenant_variant
+):
+    """A credential set actually owned by the tenant is accepted, as before."""
+    own_credential = CredentialSet(
+        tenant_id=tenant_variant.tenant_id, provider=Provider.APPLE, label="own"
+    )
+    session.add(own_credential)
+    await session.flush()
+
+    svc = TemplateService(session, objectstore)
+    variant = await svc.update_variant(
+        tenant_variant.tenant_id,
+        tenant_variant.variant_id,
+        name=None,
+        is_default=None,
+        credential_set_id=own_credential.id,
+        google_class_id=None,
+    )
+    assert variant.credential_set_id == own_credential.id

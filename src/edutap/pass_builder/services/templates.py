@@ -412,9 +412,16 @@ class TemplateService:
 
         If `is_default` is set, any previously default variant for the same
         template and wallet type is unset first, so the partial unique index
-        `uq_variant_default` never sees two rows compete for the flag.
+        `uq_variant_default` never sees two rows compete for the flag. If
+        `credential_set_id` is given, it must resolve to a credential set
+        owned by this tenant -- raises `ProblemError(404,
+        "credential_not_found")` otherwise, so a mismatched or
+        another-tenant's id is rejected here instead of only failing
+        closed later, at render time (see `RenderService._load_credential_set`).
         """
         template = await self.get_template(tenant_id, template_id)
+        if credential_set_id is not None:
+            await self._require_credential_set(tenant_id, credential_set_id)
         if is_default:
             await self._unset_default(template.id, wallet_type)
         variant = TemplateVariant(
@@ -455,7 +462,11 @@ class TemplateService:
         credential_set_id: UUID | None,
         google_class_id: str | None,
     ) -> TemplateVariant:
-        """Patch a variant's name, default flag, credential set or class id."""
+        """Patch a variant's name, default flag, credential set or class id.
+
+        If `credential_set_id` is given, it must resolve to a credential
+        set owned by this tenant -- see `create_variant` for why.
+        """
         variant = await self._load_variant(tenant_id, variant_id)
         if name is not None:
             variant.name = name
@@ -464,6 +475,7 @@ class TemplateService:
                 await self._unset_default(variant.template_id, variant.wallet_type)
             variant.is_default = is_default
         if credential_set_id is not None:
+            await self._require_credential_set(tenant_id, credential_set_id)
             variant.credential_set_id = credential_set_id
         if google_class_id is not None:
             variant.google_class_id = google_class_id
@@ -777,6 +789,25 @@ class TemplateService:
             == tenant_id,
         )
         return (await self._session.execute(query)).scalar_one_or_none()
+
+    async def _require_credential_set(
+        self, tenant_id: UUID, credential_set_id: UUID
+    ) -> CredentialSet:
+        """Return the tenant-scoped credential set for an id, or raise 404.
+
+        Used wherever a caller is about to *assign* a `credential_set_id`
+        to a variant (`create_variant`, `update_variant`): unlike
+        `_load_credential_set` (used for read paths that already treat a
+        missing/foreign id as "not configured"), assigning an id that does
+        not resolve for this tenant is a caller error and must be rejected
+        at write time -- rendering already fails closed on a mismatched id
+        (see `RenderService._load_credential_set`), but catching it here
+        means a stale or another tenant's id never gets stored at all.
+        """
+        credential_set = await self._load_credential_set(tenant_id, credential_set_id)
+        if credential_set is None:
+            raise ProblemError(404, "credential_not_found", "Credential not found")
+        return credential_set
 
     async def _replace_rules(
         self, version_id: UUID, rules: list[RuleSpec], *, origin: RuleOrigin

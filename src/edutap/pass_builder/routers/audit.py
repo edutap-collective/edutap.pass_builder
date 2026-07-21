@@ -1,9 +1,10 @@
 """Audit log query endpoint. Scope `manage`."""
 
 from datetime import datetime
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,13 +44,20 @@ async def list_audit(
     template: UUID | None = None,
     subject_ref: str | None = None,
     outcome: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> list[AuditEntryResponse]:
     """List the tenant's audit entries, optionally filtered.
 
     `template` filters by template id. `from_`/`to` bound `ts`. Results are
-    ordered newest first.
+    ordered newest first. `limit` (default 100, max 1000) and `offset`
+    (default 0) bound and page the result set -- the audit table grows
+    with every render, so an unbounded query here would eventually scan
+    and return the tenant's entire history. Plain limit/offset is enough
+    for now; cursor-based pagination is a separate follow-up if callers
+    ever need to page deep, stable result sets.
     """
     query = select(AuditLog).where(
         AuditLog.tenant_id == auth.tenant_id  # ty: ignore[invalid-argument-type]
@@ -74,8 +82,10 @@ async def list_audit(
         query = query.where(
             AuditLog.outcome == outcome  # ty: ignore[invalid-argument-type]
         )
-    query = query.order_by(
-        AuditLog.ts.desc()  # ty: ignore[unresolved-attribute]
+    query = (
+        query.order_by(AuditLog.ts.desc())  # ty: ignore[unresolved-attribute]
+        .limit(limit)
+        .offset(offset)
     )
     rows = (await session.execute(query)).scalars().all()
     return [_to_response(row) for row in rows]

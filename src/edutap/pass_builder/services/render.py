@@ -5,6 +5,7 @@ template actually maps (data minimisation), never logs or audits a field
 *value*, and writes an audit entry on both success and failure.
 """
 
+import copy
 import json
 import time
 from collections.abc import Callable
@@ -20,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import AuthContext
 from ..clients.data_provider import DataProviderClient
-from ..engine.apple_apply import apply_apple
+from ..engine.apple_apply import NfcPayloadTooLongError, apply_apple
 from ..engine.apple_build import build_apple
 from ..engine.binding import MissingFieldsError, bind, required_fields
 from ..engine.google_apply import apply_google
@@ -30,7 +31,7 @@ from ..errors import ProblemError
 from ..models.db import CredentialSet, Template, TemplateVariant, TemplateVersion
 from ..models.enums import ValueType, VersionStatus, WalletType
 from ..settings import Settings
-from .audit import write_audit
+from .audit import write_audit, write_audit_durable
 from .credentials import CredentialService
 from .templates import TemplateService
 
@@ -329,11 +330,20 @@ class RenderService:
         bound_fields = [item.rule.source_field for item in bound]
 
         if spec.wallet_type == WalletType.APPLE:
+            # Deep, not shallow: `_set_field`/`_set_pointer` mutate nested
+            # dicts (a field entry, a JSON-pointer target's parent) in
+            # place, not just the top-level dict `dict(...)` would copy --
+            # a shallow copy here would still share and mutate those
+            # nested structures with the ORM-managed `spec.pass_json`,
+            # exactly like `build_apple` deep-copies for the same reason.
             resolved, _assets = apply_apple(
-                dict(spec.pass_json or {}), dict(spec.assets), bound
+                copy.deepcopy(spec.pass_json or {}), dict(spec.assets), bound
             )
             return {"pass_json": resolved, "bound_fields": bound_fields}
         if spec.wallet_type == WalletType.GOOGLE:
+            # `apply_google` (via `resolve_placeholders`) already returns a
+            # brand new structure rather than mutating its input -- unlike
+            # `apply_apple`, it needs no defensive copy here.
             resolved_object = apply_google(dict(spec.object_json or {}), bound)
             return {"object_json": resolved_object, "bound_fields": bound_fields}
         raise ProblemError(
@@ -451,8 +461,13 @@ class RenderService:
         person_uid: str,
         fields: list[str],
     ) -> None:
-        """Write one `outcome="error"` audit entry for `_render`'s except clauses."""
-        await write_audit(
+        """Write one `outcome="error"` audit entry for `_render`'s except clauses.
+
+        Written durably (see `write_audit_durable`), on its own connection,
+        so it survives the request session's rollback once the exception
+        this is called from finishes propagating out to `get_session`.
+        """
+        await write_audit_durable(
             self._session,
             tenant_id=auth.tenant_id,
             request_id=request_id,
@@ -496,7 +511,17 @@ class RenderService:
         """Build the platform payload and deliver it (sign, or push to Google)."""
         if spec.wallet_type == WalletType.APPLE:
             sign = await self._apple_signer(tenant_id, variant.credential_set_id)
-            pkpass = build_apple(spec, bound, serial_number=pass_id, sign=sign)
+            try:
+                pkpass = build_apple(spec, bound, serial_number=pass_id, sign=sign)
+            except NfcPayloadTooLongError as exc:
+                # Never include the payload value itself -- only its length
+                # is on the exception, and even that stays out of the
+                # message surfaced to the caller (spec section 6).
+                raise ProblemError(
+                    422,
+                    "nfc_payload_too_long",
+                    "NFC payload exceeds the 64 character limit",
+                ) from exc
             credential_set = await self._load_credential_set(
                 tenant_id, variant.credential_set_id
             )
