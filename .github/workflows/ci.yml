@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  # Settings() requires these three; individual test modules also set safe
+  # defaults via `os.environ.setdefault` (see tests/routers/conftest.py), but
+  # declaring them here keeps import-time `Settings()` construction safe
+  # regardless of collection order. testcontainers provisions its own
+  # Postgres per test session and ignores this DATABASE_URL.
+  EDUTAP_PASS_BUILDER_DATABASE_URL: postgresql+asyncpg://unused/unused
+  EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+  EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL: http://data-provider.invalid
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        run: uv python install 3.14
+
+      - name: Install the package with dev and docs extras
+        run: uv pip install --system -e ".[dev,docs]"
+
+      - name: Ruff check
+        run: uv run ruff check src tests
+
+      - name: Ruff format check
+        run: uv run ruff format --check src tests
+
+      - name: Type check
+        run: uv run ty check
+
+      - name: Test
+        # testcontainers spins up its own Postgres via the Docker daemon
+        # that ubuntu-latest runners already provide, so no `services:`
+        # block is needed for the non-integration suite.
+        run: uv run pytest -m "not integration"
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the application image
+        run: docker build -t pass-builder:ci .
