@@ -77,6 +77,7 @@ async def _owner_setup(client, session):
         "/api/v1/versions/{version}/mappings",
         "/api/v1/templates/{template}/variants",
         "/api/v1/variants/{variant}/versions",
+        "/api/v1/versions/{version}/assets/icon.png",
     ],
 )
 async def test_other_tenant_gets_404_on_manage_endpoints(
@@ -130,6 +131,17 @@ async def test_other_tenant_gets_404_on_credential_revoke(client, session):
         f"/api/v1/credentials/{ids['credential']}", headers=other.headers
     )
     assert response.status_code == 404
+
+
+async def test_other_tenant_cannot_sync_foreign_variant(client, session):
+    ids = await _owner_setup(client, session)
+    other = await seed_client(session, [Scope.MANAGE])
+
+    response = await client.post(
+        f"/api/v1/variants/{ids['variant']}/sync", headers=other.headers
+    )
+    assert response.status_code == 404
+    assert response.status_code != 403
 
 
 async def test_other_tenant_cannot_render_foreign_template(client, session):

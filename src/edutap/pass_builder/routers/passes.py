@@ -105,6 +105,7 @@ async def update_pass(
 async def save_link(
     pass_id: str,
     body: SaveLinkRequest,
+    request: Request,
     auth: AuthContext = Depends(require(Scope.RENDER)),  # noqa: B008
     render_service: RenderService = Depends(get_render_service),  # noqa: B008
 ) -> dict[str, str]:
@@ -115,6 +116,7 @@ async def save_link(
         template_key=body.template,
         variant_key=body.variant,
         version_number=body.template_version,
+        request_id=request.headers.get("x-request-id"),
     )
     return {"save_link": link}
 

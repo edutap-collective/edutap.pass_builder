@@ -1,12 +1,15 @@
 """Template, variant, version, mapping and asset endpoints. Scope `manage`."""
 
 import json
+import time
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import AuthContext, require
+from ..database import get_session
 from ..dependencies import get_credential_service, get_template_service
 from ..errors import ProblemError
 from ..models.api import (
@@ -24,11 +27,42 @@ from ..models.api import (
     VersionResponse,
 )
 from ..models.db import Template, TemplateAsset, TemplateVariant, TemplateVersion
-from ..models.enums import Scope
+from ..models.enums import Scope, WalletType
+from ..services.audit import elapsed_ms, write_audit
 from ..services.credentials import CredentialService
 from ..services.templates import TemplateService
 
 router = APIRouter(prefix="/api/v1", tags=["templates"])
+
+
+async def _audit(
+    session: AsyncSession,
+    request: Request,
+    auth: AuthContext,
+    action: str,
+    *,
+    start: float,
+    template_id: UUID | None = None,
+    variant_id: UUID | None = None,
+    version_id: UUID | None = None,
+) -> None:
+    """Write a `success` audit entry for a template/variant lifecycle action."""
+    await write_audit(
+        session,
+        tenant_id=auth.tenant_id,
+        request_id=request.headers.get("x-request-id") or "",
+        actor_client_id=auth.client_id,
+        action=action,
+        outcome="success",
+        error_code=None,
+        duration_ms=elapsed_ms(start),
+        template_id=template_id,
+        variant_id=variant_id,
+        version_id=version_id,
+        wallet_type=None,
+        subject_ref=None,
+        requested_fields=[],
+    )
 
 
 def _template_response(template: Template) -> TemplateResponse:
@@ -207,12 +241,27 @@ async def update_variant(
 @router.post("/variants/{variant_id}/sync")
 async def sync_variant(
     variant_id: UUID,
+    request: Request,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     templates: TemplateService = Depends(get_template_service),  # noqa: B008
     credentials: CredentialService = Depends(get_credential_service),  # noqa: B008
+    session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> dict[str, str]:
-    """Push a Google variant's published class definition. Idempotent."""
+    """Push a Google variant's published class definition. Idempotent.
+
+    Validates the variant is Google-typed *before* touching any credential
+    material -- a non-Google variant is rejected without ever opening or
+    decrypting a credential set, since credentials only need to be decrypted
+    once it is known a Google push is actually going to happen.
+    """
+    start = time.monotonic()
     variant = await templates.get_variant(auth.tenant_id, variant_id)
+    if variant.wallet_type != WalletType.GOOGLE:
+        raise ProblemError(
+            400,
+            "not_a_google_variant",
+            "sync is only valid for Google variants",
+        )
     if variant.credential_set_id is None:
         raise ProblemError(
             409,
@@ -223,6 +272,9 @@ async def sync_variant(
     material = await credentials.open_material(credential_set)
     google_credentials: dict[str, Any] = json.loads(material)
     await templates.sync_variant(auth.tenant_id, variant_id, google_credentials)
+    await _audit(
+        session, request, auth, "variant.sync", start=start, variant_id=variant.id
+    )
     return {"status": "synced"}
 
 
@@ -324,11 +376,25 @@ async def validate_version(
 @router.post("/versions/{version_id}/publish", response_model=VersionResponse)
 async def publish_version(
     version_id: UUID,
+    request: Request,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     templates: TemplateService = Depends(get_template_service),  # noqa: B008
+    session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> VersionResponse:
     """Validate then publish a draft version, archiving its predecessor."""
+    start = time.monotonic()
     version = await templates.publish(auth.tenant_id, version_id)
+    variant = await templates.get_variant(auth.tenant_id, version.variant_id)
+    await _audit(
+        session,
+        request,
+        auth,
+        "template.publish",
+        start=start,
+        template_id=variant.template_id,
+        variant_id=variant.id,
+        version_id=version.id,
+    )
     return _version_response(version)
 
 

@@ -1,5 +1,10 @@
 """Happy-path tests for the credentials router."""
 
+import json
+
+from sqlalchemy import select
+
+from edutap.pass_builder.models.db import AuditLog
 from edutap.pass_builder.models.enums import Scope
 
 from .conftest import seed_client
@@ -142,3 +147,37 @@ async def test_scope_manage_cannot_use_credentials_endpoints(client, session):
 
     response = await client.get("/api/v1/credentials", headers=manager.headers)
     assert response.status_code == 403
+
+
+async def test_credential_create_is_audited(client, session):
+    creds_client = await seed_client(session, [Scope.CREDENTIALS])
+
+    response = await client.post(
+        "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+    )
+    assert response.status_code == 201
+
+    rows = (
+        (
+            await session.execute(
+                select(AuditLog).where(
+                    AuditLog.tenant_id  # ty: ignore[invalid-argument-type]
+                    == creds_client.tenant_id
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    [entry] = rows
+    assert entry.action == "credential.create"
+    assert entry.outcome == "success"
+    assert entry.error_code is None
+    assert entry.requested_fields == []
+
+    # No secret material -- the private key never leaves `open_material` --
+    # can end up in an audit row: serialize the whole entry and check for
+    # PEM markers rather than trusting any single column.
+    serialized = json.dumps(entry.model_dump(mode="json"))
+    assert "PRIVATE KEY" not in serialized
+    assert "BEGIN" not in serialized

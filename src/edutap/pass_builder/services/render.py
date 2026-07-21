@@ -189,41 +189,106 @@ class RenderService:
         wallet_type: WalletType = WalletType.GOOGLE,
         variant_key: str | None = None,
         version_number: int | None = None,
+        request_id: str | None = None,
     ) -> str:
         """Return a Google "save to wallet" link for an already-pushed object.
 
         Apple passes have no equivalent web link in this design -- they are
         distributed as a signed `.pkpass` file -- so only
-        `WalletType.GOOGLE` is supported here.
+        `WalletType.GOOGLE` is supported here. Writes a `pass.save_link`
+        audit entry on both success and failure, mirroring `_render` --
+        `pass_id` is recorded as `subject_ref`, never a field value.
         """
         if wallet_type != WalletType.GOOGLE:
             raise NotImplementedError(
                 "save_link is only implemented for WalletType.GOOGLE"
             )
-        _template, variant, _version = await self._resolve(
-            auth.tenant_id, template_key, wallet_type, variant_key, version_number
-        )
-        credential_set = await self._load_credential_set(
-            auth.tenant_id, variant.credential_set_id
-        )
-        if credential_set is None or credential_set.issuer_id is None:
-            raise ProblemError(
-                409,
-                "google_credentials_missing",
-                "No Google credential set configured for this variant",
+        start = time.monotonic()
+        request_id = request_id or str(uuid4())
+        template_id: UUID | None = None
+        variant_id: UUID | None = None
+        version_id: UUID | None = None
+        try:
+            _template, variant, _version = await self._resolve(
+                auth.tenant_id, template_key, wallet_type, variant_key, version_number
             )
-        if variant.google_class_id is None:
-            raise ProblemError(
-                409,
-                "google_class_not_configured",
-                "Variant has no Google class id configured",
+            template_id, variant_id, version_id = (
+                _template.id,
+                variant.id,
+                _version.id,
             )
-        credentials = await self._open_google_credentials(credential_set)
-        object_id = google_object_id(credential_set.issuer_id, pass_id)
-        reference = self._google_api.new(
-            "Reference", {"id": object_id, "model_name": _GOOGLE_OBJECT_MODEL}
+            credential_set = await self._load_credential_set(
+                auth.tenant_id, variant.credential_set_id
+            )
+            if credential_set is None or credential_set.issuer_id is None:
+                raise ProblemError(
+                    409,
+                    "google_credentials_missing",
+                    "No Google credential set configured for this variant",
+                )
+            if variant.google_class_id is None:
+                raise ProblemError(
+                    409,
+                    "google_class_not_configured",
+                    "Variant has no Google class id configured",
+                )
+            credentials = await self._open_google_credentials(credential_set)
+            object_id = google_object_id(credential_set.issuer_id, pass_id)
+            reference = self._google_api.new(
+                "Reference", {"id": object_id, "model_name": _GOOGLE_OBJECT_MODEL}
+            )
+            link = self._google_api.save_link([reference], credentials=credentials)
+        except ProblemError as exc:
+            await self._write_error_audit(
+                auth=auth,
+                request_id=request_id,
+                action="pass.save_link",
+                error_code=exc.slug,
+                start=start,
+                template_id=template_id,
+                variant_id=variant_id,
+                version_id=version_id,
+                wallet_type=wallet_type,
+                person_uid=pass_id,
+                fields=[],
+            )
+            raise
+        except Exception as exc:
+            # Mirrors `_render`: any unexpected error still leaves an audit
+            # trail, with only a generic slug -- never the original message,
+            # which could carry secret material.
+            await self._write_error_audit(
+                auth=auth,
+                request_id=request_id,
+                action="pass.save_link",
+                error_code="internal_error",
+                start=start,
+                template_id=template_id,
+                variant_id=variant_id,
+                version_id=version_id,
+                wallet_type=wallet_type,
+                person_uid=pass_id,
+                fields=[],
+            )
+            raise ProblemError(500, "internal_error", "Internal error") from exc
+
+        await write_audit(
+            self._session,
+            tenant_id=auth.tenant_id,
+            request_id=request_id,
+            actor_client_id=auth.client_id,
+            action="pass.save_link",
+            outcome="success",
+            error_code=None,
+            duration_ms=_elapsed_ms(start),
+            template_id=template_id,
+            variant_id=variant_id,
+            version_id=version_id,
+            wallet_type=wallet_type,
+            subject_ref=pass_id,
+            requested_fields=[],
         )
-        return self._google_api.save_link([reference], credentials=credentials)
+        return link
 
     async def preview(
         self,

@@ -5,8 +5,20 @@ modification of a `published` version -- mappings or assets -- must yield
 `409`.
 """
 
-from edutap.pass_builder.models.db import DataField
-from edutap.pass_builder.models.enums import Scope, ValueType
+from uuid import UUID
+
+from sqlalchemy import select
+
+from edutap.pass_builder.dependencies import get_template_service
+from edutap.pass_builder.models.db import (
+    AuditLog,
+    DataField,
+    Template,
+    TemplateVariant,
+    TemplateVersion,
+)
+from edutap.pass_builder.models.enums import Scope, ValueType, VersionStatus, WalletType
+from edutap.pass_builder.services.templates import TemplateService
 
 from .conftest import make_apple_bundle, seed_client
 
@@ -355,3 +367,189 @@ async def test_get_asset_returns_bytes(client, session):
     )
     assert response.status_code == 200
     assert response.content == b"\x89PNG"
+
+
+# --- audit -------------------------------------------------------------------
+
+
+async def test_publish_is_audited(client, session):
+    manager = await seed_client(session, [Scope.MANAGE])
+    template_id, variant_id = await _create_template_and_variant(
+        client, manager.headers
+    )
+    session.add(DataField(key="person.name", value_type=ValueType.TEXT, label="Name"))
+    await session.flush()
+
+    version_id = await _publish_valid_version(client, manager.headers, variant_id)
+
+    rows = (
+        (
+            await session.execute(
+                select(AuditLog).where(
+                    AuditLog.tenant_id  # ty: ignore[invalid-argument-type]
+                    == manager.tenant_id,
+                    AuditLog.action  # ty: ignore[invalid-argument-type]
+                    == "template.publish",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    [entry] = rows
+    assert entry.outcome == "success"
+    assert entry.template_id == UUID(template_id)
+    assert entry.variant_id == UUID(variant_id)
+    assert entry.version_id == UUID(version_id)
+
+
+# --- variant sync --------------------------------------------------------------
+
+
+class FakeGoogleApi:
+    """Records `Class` push calls instead of hitting the network.
+
+    Same shape as `tests/services/test_render.py`'s `FakeGoogleApi`, kept
+    local here since router tests wire it in through a dependency override
+    rather than `TemplateService`'s constructor.
+    """
+
+    def __init__(self) -> None:
+        self.created: list[tuple[dict, dict | None]] = []
+
+    def new(self, name: str, data: dict) -> dict:
+        return {"__model_name__": name, **data}
+
+    async def acreate(self, data: dict, *, credentials: dict | None = None) -> dict:
+        self.created.append((data, credentials))
+        return data
+
+    async def aupdate(self, data: dict, *, credentials: dict | None = None) -> dict:
+        return data
+
+
+async def _seed_google_variant(
+    client, session, headers, tenant_id
+) -> tuple[UUID, UUID]:
+    """Seed a published Google variant with a real credential set. Returns ids."""
+    credential = (
+        await client.post(
+            "/api/v1/credentials",
+            json={
+                "provider": "google",
+                "label": "google-demo",
+                "issuer_id": "3388",
+                "service_account_json": {
+                    "client_email": "svc@proj.iam.gserviceaccount.com",
+                    "private_key_id": "kid-1",
+                    "project_id": "proj",
+                    "private_key": (
+                        "-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----\n"
+                    ),
+                },
+            },
+            headers=headers,
+        )
+    ).json()
+
+    template = Template(tenant_id=tenant_id, key="staff-id", name="Staff ID")
+    session.add(template)
+    await session.flush()
+    variant = TemplateVariant(
+        template_id=template.id,
+        wallet_type=WalletType.GOOGLE,
+        key="staff",
+        name="Staff",
+        is_default=True,
+        credential_set_id=UUID(credential["id"]),
+        google_class_id="3388.staff",
+    )
+    session.add(variant)
+    await session.flush()
+    session.add(
+        TemplateVersion(
+            variant_id=variant.id,
+            number=1,
+            status=VersionStatus.PUBLISHED,
+            class_json={"id": "3388.staff"},
+            object_json={"id": "3388.staff.{{pass_id}}"},
+        )
+    )
+    await session.flush()
+    return variant.id, UUID(credential["id"])
+
+
+async def test_variant_sync_endpoint(client, session, objectstore, app):
+    manager = await seed_client(session, [Scope.MANAGE, Scope.CREDENTIALS])
+    variant_id, _credential_id = await _seed_google_variant(
+        client, session, manager.headers, manager.tenant_id
+    )
+
+    fake_google = FakeGoogleApi()
+    app.dependency_overrides[get_template_service] = lambda: TemplateService(
+        session, objectstore, google_api=fake_google
+    )
+
+    response = await client.post(
+        f"/api/v1/variants/{variant_id}/sync", headers=manager.headers
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {"status": "synced"}
+    assert len(fake_google.created) == 1
+
+    rows = (
+        (
+            await session.execute(
+                select(AuditLog).where(
+                    AuditLog.tenant_id  # ty: ignore[invalid-argument-type]
+                    == manager.tenant_id,
+                    AuditLog.action  # ty: ignore[invalid-argument-type]
+                    == "variant.sync",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    [entry] = rows
+    assert entry.outcome == "success"
+    assert entry.variant_id == variant_id
+
+
+async def test_variant_sync_rejects_non_google_variant_before_decrypting(
+    client, session
+):
+    """A non-Google variant is rejected before any credential is opened.
+
+    The attached credential set is Apple's (PEM private key, not JSON): if
+    the handler ever decrypted before checking `wallet_type`, the
+    `json.loads` on that PEM would blow up instead of yielding a clean
+    `400`. This is the ordering guarantee from spec section 6 in test form.
+    """
+    manager = await seed_client(session, [Scope.MANAGE, Scope.CREDENTIALS])
+    _template_id, variant_id = await _create_template_and_variant(
+        client, manager.headers
+    )
+    credential = (
+        await client.post(
+            "/api/v1/credentials",
+            json={
+                "provider": "apple",
+                "label": "demo",
+                "common_name": "Pass Type ID: pass.demo.lmu.de",
+            },
+            headers=manager.headers,
+        )
+    ).json()
+    patch_response = await client.patch(
+        f"/api/v1/variants/{variant_id}",
+        json={"credential_set_id": credential["id"]},
+        headers=manager.headers,
+    )
+    assert patch_response.status_code == 200
+
+    response = await client.post(
+        f"/api/v1/variants/{variant_id}/sync", headers=manager.headers
+    )
+    assert response.status_code == 400
+    assert response.json()["type"].endswith("not_a_google_variant")

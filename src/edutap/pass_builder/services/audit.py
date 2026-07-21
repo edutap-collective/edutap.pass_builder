@@ -1,11 +1,23 @@
 """Write audit entries. Never records field values or secrets."""
 
+import time
 from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.db import AuditLog
+
+
+def elapsed_ms(start: float) -> int:
+    """Return the milliseconds elapsed since `start` (a `time.monotonic()`).
+
+    Shared by every caller that measures a lifecycle action's duration for
+    its audit entry -- `RenderService` keeps its own copy for the hot render
+    path, but routers writing the simpler lifecycle events (credential,
+    template, variant) use this one.
+    """
+    return int((time.monotonic() - start) * 1000)
 
 
 async def write_audit(
