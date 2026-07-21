@@ -1,6 +1,9 @@
 """S3-compatible object store client for RustFS."""
 
 import aioboto3
+from botocore.exceptions import ClientError
+
+_BUCKET_ALREADY_PROVISIONED = {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"}
 
 
 class ObjectStore:
@@ -39,3 +42,24 @@ class ObjectStore:
             response = await s3.get_object(Bucket=self._bucket, Key=key)
             body: bytes = await response["Body"].read()
             return body
+
+    async def ensure_bucket(self) -> None:
+        """Create the configured bucket if it does not already exist.
+
+        Called once at application startup (`app.py`'s `lifespan`) so a
+        first `put`/`get` never fails only because the bucket was never
+        provisioned. Idempotent: "already owned/exists" is treated as
+        success rather than an error.
+        """
+        async with self._session.client("s3", endpoint_url=self._endpoint_url) as s3:
+            try:
+                await s3.create_bucket(Bucket=self._bucket)
+            except ClientError as exc:
+                code = exc.response.get("Error", {}).get("Code", "")
+                if code not in _BUCKET_ALREADY_PROVISIONED:
+                    raise
+
+    async def ping(self) -> None:
+        """Raise if the configured bucket is not reachable."""
+        async with self._session.client("s3", endpoint_url=self._endpoint_url) as s3:
+            await s3.head_bucket(Bucket=self._bucket)

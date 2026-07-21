@@ -18,7 +18,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from ..engine.spec import RuleSpec
-from .enums import CredentialStatus, Provider, ValueType, WalletType
+from .enums import CredentialStatus, Provider, ValueType, VersionStatus, WalletType
 
 
 class CreatePassRequest(BaseModel):
@@ -29,6 +29,24 @@ class CreatePassRequest(BaseModel):
     wallet_type: WalletType
     variant: str | None = None
     person_uid: str
+    template_version: int | None = None
+
+
+class UpdatePassRequest(BaseModel):
+    """Request body to re-render an existing pass. Same as create, minus the id."""
+
+    template: str
+    wallet_type: WalletType
+    variant: str | None = None
+    person_uid: str
+    template_version: int | None = None
+
+
+class SaveLinkRequest(BaseModel):
+    """Request body to generate a Google "save to wallet" link."""
+
+    template: str
+    variant: str | None = None
     template_version: int | None = None
 
 
@@ -61,6 +79,13 @@ class TemplateResponse(BaseModel):
     archived_at: datetime | None = None
 
 
+class UpdateTemplateRequest(BaseModel):
+    """Request body to patch a template's name or description."""
+
+    name: str | None = None
+    description: str | None = None
+
+
 class CreateVariantRequest(BaseModel):
     """Request body to create a new template variant."""
 
@@ -87,10 +112,64 @@ class VariantResponse(BaseModel):
     archived_at: datetime | None = None
 
 
+class UpdateVariantRequest(BaseModel):
+    """Request body to patch a variant's default flag or credential/class id."""
+
+    name: str | None = None
+    is_default: bool | None = None
+    credential_set_id: UUID | None = None
+    google_class_id: str | None = None
+
+
+class CreateGoogleVersionRequest(BaseModel):
+    """Request body to create a draft Google version (JSON, not multipart)."""
+
+    class_json: dict[str, Any]
+    object_json: dict[str, Any]
+
+
+class VersionResponse(BaseModel):
+    """Response describing a template version."""
+
+    id: UUID
+    variant_id: UUID
+    number: int
+    status: VersionStatus
+    nfc_enabled: bool
+    nfc_encryption_public_key: str | None = None
+    nfc_requires_authentication: bool = False
+    notes: str | None = None
+    created_at: datetime
+    published_at: datetime | None = None
+
+
 class MappingRulesRequest(BaseModel):
     """Request body to replace a draft version's mapping rules."""
 
     rules: list[RuleSpec]
+
+
+class MappingRulesResponse(BaseModel):
+    """Response listing a version's mapping rules."""
+
+    rules: list[RuleSpec]
+
+
+class AssetResponse(BaseModel):
+    """Response describing one stored template asset (metadata only)."""
+
+    filename: str
+    media_type: str
+    size: int
+    sha256: str
+    created_at: datetime
+
+
+class ValidationResponse(BaseModel):
+    """Response describing the outcome of a (non-publishing) validation run."""
+
+    valid: bool
+    findings: list[str] = []
 
 
 class CreateCredentialRequest(BaseModel):
@@ -102,6 +181,14 @@ class CreateCredentialRequest(BaseModel):
     """Apple only: the CSR subject common name for `create_apple`."""
     issuer_id: str | None = None
     """Google only: the Google Wallet issuer id."""
+    service_account_json: dict[str, Any] | None = None
+    """Google only: the service account key file to import."""
+
+
+class InstallCertificateRequest(BaseModel):
+    """Request body to install a signed certificate onto a pending credential."""
+
+    certificate_pem: str
 
 
 class CredentialResponse(BaseModel):
@@ -134,6 +221,14 @@ class PreviewRequest(BaseModel):
     variant: str | None = None
     template_version: int | None = None
     sample_data: dict[str, Any] | None = None
+
+
+class PreviewResponse(BaseModel):
+    """Response with the resolved pass/object preview, never signed or pushed."""
+
+    pass_json: dict[str, Any] | None = None
+    object_json: dict[str, Any] | None = None
+    bound_fields: list[str]
 
 
 class FieldResponse(BaseModel):

@@ -57,6 +57,8 @@ class RenderResult(BaseModel):
     class_id: str | None = None
     template_version: int
     variant: str
+    credential_set: str | None = None
+    """The credential set's label, if one was used to sign or push."""
 
 
 class SupportsGoogleApi(Protocol):
@@ -418,11 +420,15 @@ class RenderService:
         if spec.wallet_type == WalletType.APPLE:
             sign = await self._apple_signer(tenant_id, variant.credential_set_id)
             pkpass = build_apple(spec, bound, serial_number=pass_id, sign=sign)
+            credential_set = await self._load_credential_set(
+                tenant_id, variant.credential_set_id
+            )
             return RenderResult(
                 wallet_type=WalletType.APPLE,
                 pkpass=pkpass,
                 template_version=version.number,
                 variant=variant.key,
+                credential_set=credential_set.label if credential_set else None,
             )
 
         if spec.wallet_type == WalletType.GOOGLE:
@@ -461,6 +467,7 @@ class RenderService:
                 class_id=variant.google_class_id,
                 template_version=version.number,
                 variant=variant.key,
+                credential_set=credential_set.label if credential_set else None,
             )
 
         raise ProblemError(

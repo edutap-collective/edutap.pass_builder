@@ -203,6 +203,50 @@ class CredentialService:
         result = await self._session.execute(query)
         return list(result.scalars().all())
 
+    async def get(self, tenant_id: UUID, credential_id: UUID) -> CredentialSet:
+        """Return the tenant-scoped credential set by id, or raise 404."""
+        return await self._load(tenant_id, credential_id)
+
+    async def renew(self, tenant_id: UUID, credential_id: UUID) -> CredentialSet:
+        """Create a successor Apple credential set with a fresh keypair and CSR.
+
+        The predecessor is left untouched -- it stays `active` until it
+        actually expires, so renewal never interrupts issuance (spec section
+        3, "Credential lifecycle (Apple)", step 4).
+        """
+        predecessor = await self._load(tenant_id, credential_id)
+        if predecessor.provider != Provider.APPLE:
+            raise ProblemError(
+                400, "invalid_request", "renew is only supported for Apple credentials"
+            )
+        common_name = predecessor.pass_type_identifier or predecessor.label
+        key_pem = generate_private_key()
+        csr_pem = build_csr(key_pem, common_name)
+
+        successor = CredentialSet(
+            tenant_id=tenant_id,
+            provider=Provider.APPLE,
+            label=predecessor.label,
+            status=CredentialStatus.KEY_PENDING,
+            predecessor_id=predecessor.id,
+            csr_pem=csr_pem.decode(),
+        )
+        self._session.add(successor)
+        await self._session.flush()
+
+        await self._store_secret(successor.id, SecretKind.PRIVATE_KEY, key_pem)
+        await self._session.flush()
+        return successor
+
+    async def revoke(self, tenant_id: UUID, credential_id: UUID) -> CredentialSet:
+        """Mark a credential set `revoked`. Never a hard delete."""
+        credential_set = await self._load(tenant_id, credential_id)
+        credential_set.status = CredentialStatus.REVOKED
+        credential_set.updated_at = datetime.now(UTC)
+        self._session.add(credential_set)
+        await self._session.flush()
+        return credential_set
+
     async def get_csr(self, tenant_id: UUID, credential_id: UUID) -> str:
         """Return the stored CSR PEM for a credential set."""
         credential_set = await self._load(tenant_id, credential_id)

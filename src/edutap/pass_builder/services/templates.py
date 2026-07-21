@@ -6,9 +6,11 @@ import json
 import mimetypes
 import zipfile
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
+from edutap.wallet_google import api as wallet_google_api
+from edutap.wallet_google.exceptions import ObjectAlreadyExistsException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +28,8 @@ from ..models.db import (
 )
 from ..models.enums import RuleOrigin, TargetKind, ValueType, VersionStatus, WalletType
 from .mapping_validation import validate_mapping_rules
+
+_GOOGLE_CLASS_MODEL = "Class"
 
 _TOOLING_JSON = "tooling.json"
 _PASS_JSON = "pass.json"  # noqa: S105 - a filename, not a credential
@@ -67,6 +71,27 @@ class SupportsObjectStore(Protocol):
         ...
 
 
+class SupportsGoogleApi(Protocol):
+    """The subset of `edutap.wallet_google.api` `sync_variant` depends on.
+
+    A `Protocol` rather than the concrete module so unit tests can inject a
+    fake that never touches the network -- mirrors `RenderService`'s own
+    `SupportsGoogleApi`.
+    """
+
+    def new(self, name: str, data: dict[str, Any]) -> Any:
+        """Build a registered Google Wallet model instance from plain data."""
+        ...
+
+    async def acreate(self, data: Any, *, credentials: dict | None = None) -> Any:
+        """Create a Google Wallet class."""
+        ...
+
+    async def aupdate(self, data: Any, *, credentials: dict | None = None) -> Any:
+        """Update a Google Wallet class."""
+        ...
+
+
 def _apple_field_keys(pass_json: dict) -> set[str]:
     """Return every field `key` found across an Apple pass.json's field groups.
 
@@ -104,10 +129,22 @@ def _mapping_rule_to_spec(row: MappingRule) -> RuleSpec:
 class TemplateService:
     """Imports, validates and publishes template versions."""
 
-    def __init__(self, session: AsyncSession, objectstore: SupportsObjectStore) -> None:
-        """Bind the service to one session and one object store."""
+    def __init__(
+        self,
+        session: AsyncSession,
+        objectstore: SupportsObjectStore,
+        *,
+        google_api: SupportsGoogleApi | None = None,
+    ) -> None:
+        """Bind the service to one session, one object store and the Google api.
+
+        `google_api` is a test-only override, replacing the real
+        `edutap.wallet_google.api` module so unit tests never touch the
+        network when exercising `sync_variant`.
+        """
         self._session = session
         self._objectstore = objectstore
+        self._google_api: SupportsGoogleApi = google_api or wallet_google_api
 
     async def import_apple_version(
         self, tenant_id: UUID, variant_id: UUID, bundle: bytes
@@ -297,6 +334,331 @@ class TemplateService:
             nfc_requires_authentication=version.nfc_requires_authentication,
             issuer_id=issuer_id,
         )
+
+    # --- template CRUD -----------------------------------------------------
+
+    async def create_template(
+        self, tenant_id: UUID, key: str, name: str, description: str | None
+    ) -> Template:
+        """Create a new template for a tenant."""
+        template = Template(
+            tenant_id=tenant_id, key=key, name=name, description=description
+        )
+        self._session.add(template)
+        await self._session.flush()
+        return template
+
+    async def list_templates(self, tenant_id: UUID) -> list[Template]:
+        """Return every template belonging to a tenant."""
+        query = select(Template).where(
+            Template.tenant_id == tenant_id  # ty: ignore[invalid-argument-type]
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
+    async def get_template(self, tenant_id: UUID, template_id: UUID) -> Template:
+        """Return the tenant-scoped template by id, or raise 404."""
+        query = select(Template).where(
+            Template.id == template_id,  # ty: ignore[invalid-argument-type]
+            Template.tenant_id  # ty: ignore[invalid-argument-type]
+            == tenant_id,
+        )
+        template = (await self._session.execute(query)).scalar_one_or_none()
+        if template is None:
+            raise ProblemError(
+                404, "template_not_found", "No such template for this tenant"
+            )
+        return template
+
+    async def update_template(
+        self,
+        tenant_id: UUID,
+        template_id: UUID,
+        name: str | None,
+        description: str | None,
+    ) -> Template:
+        """Patch a template's name and/or description."""
+        template = await self.get_template(tenant_id, template_id)
+        if name is not None:
+            template.name = name
+        if description is not None:
+            template.description = description
+        self._session.add(template)
+        await self._session.flush()
+        return template
+
+    async def archive_template(self, tenant_id: UUID, template_id: UUID) -> Template:
+        """Archive a template. Never a hard delete."""
+        template = await self.get_template(tenant_id, template_id)
+        template.archived_at = datetime.now(UTC)
+        self._session.add(template)
+        await self._session.flush()
+        return template
+
+    # --- variant CRUD --------------------------------------------------------
+
+    async def create_variant(
+        self,
+        tenant_id: UUID,
+        template_id: UUID,
+        *,
+        key: str,
+        name: str,
+        wallet_type: WalletType,
+        is_default: bool,
+        credential_set_id: UUID | None,
+        google_class_id: str | None,
+    ) -> TemplateVariant:
+        """Create a new variant under a tenant-scoped template.
+
+        If `is_default` is set, any previously default variant for the same
+        template and wallet type is unset first, so the partial unique index
+        `uq_variant_default` never sees two rows compete for the flag.
+        """
+        template = await self.get_template(tenant_id, template_id)
+        if is_default:
+            await self._unset_default(template.id, wallet_type)
+        variant = TemplateVariant(
+            template_id=template.id,
+            wallet_type=wallet_type,
+            key=key,
+            name=name,
+            is_default=is_default,
+            credential_set_id=credential_set_id,
+            google_class_id=google_class_id,
+        )
+        self._session.add(variant)
+        await self._session.flush()
+        return variant
+
+    async def list_variants(
+        self, tenant_id: UUID, template_id: UUID
+    ) -> list[TemplateVariant]:
+        """Return every variant of a tenant-scoped template."""
+        template = await self.get_template(tenant_id, template_id)
+        query = select(TemplateVariant).where(
+            TemplateVariant.template_id  # ty: ignore[invalid-argument-type]
+            == template.id
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
+    async def get_variant(self, tenant_id: UUID, variant_id: UUID) -> TemplateVariant:
+        """Return the tenant-scoped variant by id, or raise 404."""
+        return await self._load_variant(tenant_id, variant_id)
+
+    async def update_variant(
+        self,
+        tenant_id: UUID,
+        variant_id: UUID,
+        *,
+        name: str | None,
+        is_default: bool | None,
+        credential_set_id: UUID | None,
+        google_class_id: str | None,
+    ) -> TemplateVariant:
+        """Patch a variant's name, default flag, credential set or class id."""
+        variant = await self._load_variant(tenant_id, variant_id)
+        if name is not None:
+            variant.name = name
+        if is_default is not None:
+            if is_default:
+                await self._unset_default(variant.template_id, variant.wallet_type)
+            variant.is_default = is_default
+        if credential_set_id is not None:
+            variant.credential_set_id = credential_set_id
+        if google_class_id is not None:
+            variant.google_class_id = google_class_id
+        self._session.add(variant)
+        await self._session.flush()
+        return variant
+
+    async def sync_variant(
+        self, tenant_id: UUID, variant_id: UUID, credentials: dict[str, Any] | None
+    ) -> None:
+        """Push a Google variant's published class definition. Idempotent.
+
+        `credentials` is the already-decrypted service account dict for the
+        variant's credential set -- decryption happens one layer up, in the
+        router, via `CredentialService.open_material`, so this service never
+        needs a `SecretBackend`.
+        """
+        variant = await self._load_variant(tenant_id, variant_id)
+        if variant.wallet_type != WalletType.GOOGLE:
+            raise ProblemError(
+                400, "invalid_request", "sync is only valid for Google variants"
+            )
+        if variant.google_class_id is None:
+            raise ProblemError(
+                409,
+                "google_class_not_configured",
+                "Variant has no Google class id configured",
+            )
+        version = await self._resolve_version(variant.id, version_number=None)
+        if version.class_json is None:
+            raise ProblemError(
+                409,
+                "google_credentials_missing",
+                "Published version has no class_json to push",
+            )
+        payload = dict(version.class_json)
+        payload["id"] = variant.google_class_id
+        model = self._google_api.new(_GOOGLE_CLASS_MODEL, payload)
+        try:
+            await self._google_api.acreate(model, credentials=credentials)
+        except ObjectAlreadyExistsException:
+            await self._google_api.aupdate(model, credentials=credentials)
+
+    async def _unset_default(self, template_id: UUID, wallet_type: WalletType) -> None:
+        """Clear `is_default` on the current default variant, if any."""
+        query = select(TemplateVariant).where(
+            TemplateVariant.template_id  # ty: ignore[invalid-argument-type]
+            == template_id,
+            TemplateVariant.wallet_type  # ty: ignore[invalid-argument-type]
+            == wallet_type,
+            TemplateVariant.is_default.is_(True),  # ty: ignore[unresolved-attribute]
+        )
+        current = (await self._session.execute(query)).scalar_one_or_none()
+        if current is not None:
+            current.is_default = False
+            self._session.add(current)
+            await self._session.flush()
+
+    # --- version CRUD --------------------------------------------------------
+
+    async def create_google_version(
+        self,
+        tenant_id: UUID,
+        variant_id: UUID,
+        class_json: dict[str, Any],
+        object_json: dict[str, Any],
+    ) -> TemplateVersion:
+        """Create a Google draft version from JSON, mirroring the Apple import."""
+        variant = await self._load_variant(tenant_id, variant_id)
+        number = await self._next_version_number(variant.id)
+        version = TemplateVersion(
+            variant_id=variant.id,
+            number=number,
+            status=VersionStatus.DRAFT,
+            class_json=class_json,
+            object_json=object_json,
+        )
+        self._session.add(version)
+        await self._session.flush()
+        return version
+
+    async def get_version(self, tenant_id: UUID, version_id: UUID) -> TemplateVersion:
+        """Return the tenant-scoped version by id, or raise 404."""
+        return await self._load_version(tenant_id, version_id)
+
+    async def list_versions(
+        self, tenant_id: UUID, variant_id: UUID
+    ) -> list[TemplateVersion]:
+        """Return every version of a tenant-scoped variant."""
+        variant = await self._load_variant(tenant_id, variant_id)
+        query = select(TemplateVersion).where(
+            TemplateVersion.variant_id  # ty: ignore[invalid-argument-type]
+            == variant.id
+        )
+        return list((await self._session.execute(query)).scalars().all())
+
+    async def get_mappings(self, tenant_id: UUID, version_id: UUID) -> list[RuleSpec]:
+        """Return a tenant-scoped version's mapping rules."""
+        version = await self._load_version(tenant_id, version_id)
+        return [_mapping_rule_to_spec(row) for row in await self._rules_for(version.id)]
+
+    async def validate_version(self, tenant_id: UUID, version_id: UUID) -> list[str]:
+        """Run the full publish-time validation without publishing.
+
+        Returns the list of findings; an empty list means the version would
+        pass `publish()`.
+        """
+        version = await self._load_version(tenant_id, version_id)
+        variant = await self._session.get(TemplateVariant, version.variant_id)
+        assert variant is not None  # noqa: S101 - FK guarantees existence
+        return await self._validate_for_publish(tenant_id, version, variant)
+
+    # --- asset CRUD -----------------------------------------------------------
+
+    async def get_asset(
+        self, tenant_id: UUID, version_id: UUID, filename: str
+    ) -> tuple[TemplateAsset, bytes]:
+        """Return one asset's metadata row and its bytes."""
+        version = await self._load_version(tenant_id, version_id)
+        asset = await self._load_asset(version.id, filename)
+        assert asset is not None  # noqa: S101 - `required=True` raises 404 instead
+        data = await self._objectstore.get(asset.object_key)
+        return asset, data
+
+    async def put_asset(
+        self,
+        tenant_id: UUID,
+        version_id: UUID,
+        filename: str,
+        data: bytes,
+        content_type: str | None,
+    ) -> TemplateAsset:
+        """Replace one draft version's asset. Raises 409 once published."""
+        version = await self._require_draft(tenant_id, version_id)
+        media_type = content_type or (
+            mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        )
+        existing = await self._load_asset(version.id, filename, required=False)
+        if existing is not None:
+            await self._session.delete(existing)
+            await self._session.flush()
+        sha256 = hashlib.sha256(data).hexdigest()
+        key = self._objectstore.content_key(str(tenant_id), str(version.id), sha256)
+        await self._objectstore.put(key, data, media_type)
+        asset = TemplateAsset(
+            version_id=version.id,
+            filename=filename,
+            media_type=media_type,
+            size=len(data),
+            sha256=sha256,
+            object_key=key,
+        )
+        self._session.add(asset)
+        await self._session.flush()
+        return asset
+
+    async def delete_asset(
+        self, tenant_id: UUID, version_id: UUID, filename: str
+    ) -> None:
+        """Remove one draft version's asset row. Raises 409 once published.
+
+        Only the database row is removed -- the underlying object store blob
+        is content-addressed and may be shared with other versions, so it is
+        left in place.
+        """
+        version = await self._require_draft(tenant_id, version_id)
+        asset = await self._load_asset(version.id, filename)
+        await self._session.delete(asset)
+        await self._session.flush()
+
+    async def _require_draft(
+        self, tenant_id: UUID, version_id: UUID
+    ) -> TemplateVersion:
+        """Return a tenant-scoped version, raising 409 unless it is a draft."""
+        version = await self._load_version(tenant_id, version_id)
+        if version.status != VersionStatus.DRAFT:
+            raise ProblemError(
+                409, "version_not_draft", "Only draft versions accept changes"
+            )
+        return version
+
+    async def _load_asset(
+        self, version_id: UUID, filename: str, *, required: bool = True
+    ) -> TemplateAsset | None:
+        """Return one version's asset by filename, or raise/None if absent."""
+        query = select(TemplateAsset).where(
+            TemplateAsset.version_id  # ty: ignore[invalid-argument-type]
+            == version_id,
+            TemplateAsset.filename  # ty: ignore[invalid-argument-type]
+            == filename,
+        )
+        asset = (await self._session.execute(query)).scalar_one_or_none()
+        if asset is None and required:
+            raise ProblemError(404, "asset_not_found", "No such asset for this version")
+        return asset
 
     async def _store_asset(
         self, tenant_id: UUID, version: TemplateVersion, name: str, data: bytes

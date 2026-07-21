@@ -22,6 +22,7 @@ dependencies = [
     "httpx>=0.27",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
+    "python-multipart>=0.0.9",
     "sqlmodel>=0.0.22",
     "uvicorn[standard]>=0.30",
 ]
@@ -66,4 +67,4 @@ convention = "pep257"
 "tests/*" = ["D", "S101"]
 
 [tool.ty.environment]
-root = ["./src"]
+root = ["./src", "./tests"]
