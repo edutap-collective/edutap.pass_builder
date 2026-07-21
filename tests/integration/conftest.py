@@ -95,7 +95,7 @@ class E2eEnv:
 
 
 @pytest.fixture
-async def e2e_env(session, monkeypatch) -> AsyncIterator[E2eEnv]:
+async def e2e_env(session) -> AsyncIterator[E2eEnv]:
     """Seed a tenant, an Apple credential, a published template and a data provider.
 
     Runs against the Postgres testcontainer (`session`, from the top-level
@@ -106,11 +106,11 @@ async def e2e_env(session, monkeypatch) -> AsyncIterator[E2eEnv]:
     await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
 
     wwdr_path = _FIXTURES_DIR / "wwdr-g4.pem"
-    # `edutap.wallet_apple.api.sign_direct` reads the WWDR certificate from
-    # its own process-wide `Settings`, not this project's -- see the task
-    # report for why `settings.wwdr_certificate_path` below cannot drive it.
-    monkeypatch.setenv("EDUTAP_WALLET_APPLE_WWDR_CERTIFICATE", str(wwdr_path))
-
+    # `RenderService._apple_signer` reads the WWDR certificate straight from
+    # `Settings.wwdr_certificate_path` below and hands it to
+    # `PkPass.sign_direct` as bytes -- no separate `edutap.wallet_apple`
+    # environment variable needed, proving this project's own setting
+    # actually drives WWDR resolution.
     settings = Settings(
         database_url="postgresql+asyncpg://unused/unused",
         secret_master_key=base64.b64encode(os.urandom(32)).decode(),
@@ -192,7 +192,13 @@ async def e2e_env(session, monkeypatch) -> AsyncIterator[E2eEnv]:
             timeout=5.0,
             client=http_client,
         )
-        render_service = RenderService(session, templates, credentials, data_provider)
+        render_service = RenderService(
+            session,
+            templates,
+            credentials,
+            data_provider,
+            wwdr_certificate_path=settings.wwdr_certificate_path,
+        )
         auth = AuthContext(
             client_id=api_client.id, tenant_id=tenant.id, scopes={Scope.RENDER}
         )

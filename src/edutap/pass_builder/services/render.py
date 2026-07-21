@@ -8,10 +8,10 @@ template actually maps (data minimisation), never logs or audits a field
 import json
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
-from edutap.wallet_apple import api as apple_api
 from edutap.wallet_google import api as wallet_google_api
 from edutap.wallet_google.exceptions import ObjectAlreadyExistsException
 from pydantic import BaseModel
@@ -29,6 +29,7 @@ from ..engine.spec import BoundValue, RenderSpec, RuleSpec
 from ..errors import ProblemError
 from ..models.db import CredentialSet, Template, TemplateVariant, TemplateVersion
 from ..models.enums import ValueType, VersionStatus, WalletType
+from ..settings import Settings
 from .audit import write_audit
 from .credentials import CredentialService
 from .templates import TemplateService
@@ -107,6 +108,9 @@ class RenderService:
         *,
         google_api: SupportsGoogleApi | None = None,
         apple_sign: Callable[[object], None] | None = None,
+        wwdr_certificate_path: Path = Settings.model_fields[
+            "wwdr_certificate_path"
+        ].default,
     ) -> None:
         """Bind the service to its collaborators.
 
@@ -115,6 +119,13 @@ class RenderService:
         never touch the network, and `apple_sign` replaces the signer this
         service would otherwise build from `credentials` so unit tests never
         sign with a real key.
+
+        `wwdr_certificate_path` is the Apple WWDR intermediate certificate
+        used to sign, taken from `Settings.wwdr_certificate_path` by the
+        caller (see `dependencies.get_render_service`) -- resolved here via
+        constructor injection, like every other settings-derived value this
+        service's collaborators need, rather than this service reaching for
+        `get_settings()` itself.
         """
         self._session = session
         self._templates = templates
@@ -122,6 +133,7 @@ class RenderService:
         self._data_provider = data_provider
         self._google_api: SupportsGoogleApi = google_api or wallet_google_api
         self._apple_sign_override = apple_sign
+        self._wwdr_certificate_path = wwdr_certificate_path
 
     async def create_pass(
         self,
@@ -546,10 +558,21 @@ class RenderService:
     ) -> Callable[[object], None]:
         """Return the callable that signs a `PkPass` in place.
 
-        Built from `CredentialService.open_material` (the private key) and
-        the credential set's stored certificate, via
-        `edutap.wallet_apple.api.sign_direct`. Unit tests bypass this
-        entirely via the `apple_sign` constructor override.
+        Built from `CredentialService.open_material` (the private key), the
+        credential set's stored certificate, and `self._wwdr_certificate_path`
+        (from `Settings.wwdr_certificate_path`) for the Apple WWDR
+        intermediate.
+
+        Signs via `PkPass.sign_direct(private_key, certificate, wwdr)`
+        (the model method, not `edutap.wallet_apple.api.sign_direct`):
+        `api.sign_direct` ignores any WWDR we hand it and always loads its
+        own WWDR from a *separate* `edutap.wallet_apple.settings.Settings`
+        instance (env prefix `EDUTAP_WALLET_APPLE_`), which would leave our
+        `wwdr_certificate_path` setting dead. Calling the model method
+        directly lets our setting actually control which WWDR certificate
+        is used, while still handing over the key/certificate as in-memory
+        bytes rather than writing secret material to disk. Unit tests
+        bypass this entirely via the `apple_sign` constructor override.
         """
         if self._apple_sign_override is not None:
             return self._apple_sign_override
@@ -562,9 +585,10 @@ class RenderService:
             )
         key_pem = await self._credentials.open_material(credential_set)
         cert_pem = credential_set.certificate_pem.encode()
+        wwdr_pem = self._wwdr_certificate_path.read_bytes()
 
         def sign(pkpass: object) -> None:
-            apple_api.sign_direct(pkpass, key_pem, cert_pem)  # ty: ignore[invalid-argument-type]
+            pkpass.sign_direct(key_pem, cert_pem, wwdr_pem)  # ty: ignore[unresolved-attribute]
 
         return sign
 

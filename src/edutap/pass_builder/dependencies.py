@@ -73,6 +73,19 @@ def get_render_service(
     templates: Annotated[TemplateService, Depends(get_template_service)],
     credentials: Annotated[CredentialService, Depends(get_credential_service)],
     data_provider: Annotated[DataProviderClient, Depends(get_data_provider)],
+    settings: SettingsDep,
 ) -> RenderService:
-    """Build a `RenderService` bound to the session and its collaborators."""
-    return RenderService(session, templates, credentials, data_provider)
+    """Build a `RenderService` bound to the session and its collaborators.
+
+    `wwdr_certificate_path` is passed through explicitly so
+    `Settings.wwdr_certificate_path` is what actually controls the Apple
+    WWDR intermediate certificate used to sign -- see
+    `RenderService._apple_signer`.
+    """
+    return RenderService(
+        session,
+        templates,
+        credentials,
+        data_provider,
+        wwdr_certificate_path=settings.wwdr_certificate_path,
+    )
