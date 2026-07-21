@@ -1,7 +1,5 @@
 """Data-provider field catalogue endpoints. Scope `manage`."""
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +10,8 @@ from ..database import get_session
 from ..dependencies import get_data_provider
 from ..models.api import FieldResponse
 from ..models.db import DataField
-from ..models.enums import Scope, ValueType
+from ..models.enums import Scope
+from ..services.retention import refresh_catalogue
 
 router = APIRouter(prefix="/api/v1", tags=["fields"])
 
@@ -44,33 +43,7 @@ async def refresh_fields(
     session: AsyncSession = Depends(get_session),  # noqa: B008
     data_provider: DataProviderClient = Depends(get_data_provider),  # noqa: B008
 ) -> list[FieldResponse]:
-    """Refresh the cached catalogue from `data_provider`, upserting by key."""
-    catalogue = await data_provider.fetch_catalogue()
-    existing = {
-        row.key: row
-        for row in (await session.execute(select(DataField))).scalars().all()
-    }
-    now = datetime.now(UTC)
-    refreshed: list[DataField] = []
-    for entry in catalogue:
-        row = existing.get(entry.key)
-        value_type = ValueType(entry.value_type)
-        if row is None:
-            row = DataField(
-                key=entry.key,
-                value_type=value_type,
-                label=entry.label or entry.key,
-                required=entry.required,
-                description=entry.description,
-                fetched_at=now,
-            )
-        else:
-            row.value_type = value_type
-            row.label = entry.label or entry.key
-            row.required = entry.required
-            row.description = entry.description
-            row.fetched_at = now
-        session.add(row)
-        refreshed.append(row)
-    await session.flush()
-    return [_to_response(row) for row in refreshed]
+    """Replace the cached catalogue from `data_provider` and return it."""
+    await refresh_catalogue(session, data_provider)
+    rows = (await session.execute(select(DataField))).scalars().all()
+    return [_to_response(row) for row in rows]
