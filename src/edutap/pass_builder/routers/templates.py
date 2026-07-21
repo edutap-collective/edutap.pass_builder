@@ -31,6 +31,7 @@ from ..models.enums import Scope, WalletType
 from ..services.audit import elapsed_ms, write_audit
 from ..services.credentials import CredentialService
 from ..services.templates import TemplateService
+from ._lifecycle_audit import audited
 
 router = APIRouter(prefix="/api/v1", tags=["templates"])
 
@@ -271,7 +272,10 @@ async def sync_variant(
     credential_set = await credentials.get(auth.tenant_id, variant.credential_set_id)
     material = await credentials.open_material(credential_set)
     google_credentials: dict[str, Any] = json.loads(material)
-    await templates.sync_variant(auth.tenant_id, variant_id, google_credentials)
+    async with audited(
+        session, request, auth, "variant.sync", start=start, variant_id=variant.id
+    ):
+        await templates.sync_variant(auth.tenant_id, variant_id, google_credentials)
     await _audit(
         session, request, auth, "variant.sync", start=start, variant_id=variant.id
     )
@@ -383,8 +387,11 @@ async def publish_version(
 ) -> VersionResponse:
     """Validate then publish a draft version, archiving its predecessor."""
     start = time.monotonic()
-    version = await templates.publish(auth.tenant_id, version_id)
-    variant = await templates.get_variant(auth.tenant_id, version.variant_id)
+    async with audited(
+        session, request, auth, "template.publish", start=start, version_id=version_id
+    ):
+        version = await templates.publish(auth.tenant_id, version_id)
+        variant = await templates.get_variant(auth.tenant_id, version.variant_id)
     await _audit(
         session,
         request,

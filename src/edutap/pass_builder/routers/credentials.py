@@ -26,6 +26,7 @@ from ..models.db import CredentialSet
 from ..models.enums import Provider, Scope
 from ..services.audit import elapsed_ms, write_audit
 from ..services.credentials import CredentialService
+from ._lifecycle_audit import audited
 
 router = APIRouter(prefix="/api/v1", tags=["credentials"])
 
@@ -125,25 +126,26 @@ async def create_credential(
     `service_account_json`. Either missing is a `400 invalid_request`.
     """
     start = time.monotonic()
-    if body.provider == Provider.APPLE:
-        if not body.common_name:
-            raise ProblemError(
-                400, "invalid_request", "Apple credentials require common_name"
+    async with audited(session, request, auth, "credential.create", start=start):
+        if body.provider == Provider.APPLE:
+            if not body.common_name:
+                raise ProblemError(
+                    400, "invalid_request", "Apple credentials require common_name"
+                )
+            credential_set = await credentials.create_apple(
+                auth.tenant_id, body.label, body.common_name
             )
-        credential_set = await credentials.create_apple(
-            auth.tenant_id, body.label, body.common_name
-        )
-    else:
-        if not body.issuer_id or body.service_account_json is None:
-            raise ProblemError(
-                400,
-                "invalid_request",
-                "Google credentials require issuer_id and service_account_json",
+        else:
+            if not body.issuer_id or body.service_account_json is None:
+                raise ProblemError(
+                    400,
+                    "invalid_request",
+                    "Google credentials require issuer_id and service_account_json",
+                )
+            raw = json.dumps(body.service_account_json).encode()
+            credential_set = await credentials.import_google(
+                auth.tenant_id, body.label, raw, issuer_id=body.issuer_id
             )
-        raw = json.dumps(body.service_account_json).encode()
-        credential_set = await credentials.import_google(
-            auth.tenant_id, body.label, raw, issuer_id=body.issuer_id
-        )
     await _audit(session, request, auth, "credential.create", start=start)
     return _to_response(credential_set)
 
@@ -172,9 +174,12 @@ async def install_certificate(
 ) -> CredentialResponse:
     """Install the signed certificate, activating a pending Apple credential set."""
     start = time.monotonic()
-    credential_set = await credentials.install_certificate(
-        auth.tenant_id, credential_id, body.certificate_pem.encode()
-    )
+    async with audited(
+        session, request, auth, "credential.certificate_installed", start=start
+    ):
+        credential_set = await credentials.install_certificate(
+            auth.tenant_id, credential_id, body.certificate_pem.encode()
+        )
     await _audit(
         session, request, auth, "credential.certificate_installed", start=start
     )
@@ -191,7 +196,8 @@ async def renew_credential(
 ) -> CredentialResponse:
     """Create a successor Apple credential set with a fresh keypair and CSR."""
     start = time.monotonic()
-    successor = await credentials.renew(auth.tenant_id, credential_id)
+    async with audited(session, request, auth, "credential.renew", start=start):
+        successor = await credentials.renew(auth.tenant_id, credential_id)
     await _audit(session, request, auth, "credential.renew", start=start)
     return _to_response(successor)
 
@@ -206,5 +212,6 @@ async def revoke_credential(
 ) -> None:
     """Mark a credential set `revoked`. Never a hard delete."""
     start = time.monotonic()
-    await credentials.revoke(auth.tenant_id, credential_id)
+    async with audited(session, request, auth, "credential.revoke", start=start):
+        await credentials.revoke(auth.tenant_id, credential_id)
     await _audit(session, request, auth, "credential.revoke", start=start)

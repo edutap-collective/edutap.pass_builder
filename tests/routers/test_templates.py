@@ -403,6 +403,61 @@ async def test_publish_is_audited(client, session):
     assert entry.version_id == UUID(version_id)
 
 
+async def test_publish_failure_is_audited_as_error(client, session):
+    """A version that fails publish validation is audited as an error.
+
+    Reuses `make_apple_bundle(include_icon=False)` (already exercised by
+    `test_validate_reports_findings_without_publishing`) to fail publish
+    validation with `missing required asset: icon.png` -- no mapping rules
+    are needed for that finding to fire. Asserts the response is the
+    `422 template_validation_failed` problem, and that the router's
+    `audited()` guard (spec section 6) still wrote a matching
+    `outcome="error"` audit row for `template.publish`.
+    """
+    manager = await seed_client(session, [Scope.MANAGE])
+    _template_id, variant_id = await _create_template_and_variant(
+        client, manager.headers
+    )
+    upload = await client.post(
+        f"/api/v1/variants/{variant_id}/versions",
+        files={
+            "file": (
+                "bundle.pkpasstemplate",
+                make_apple_bundle(include_icon=False),
+                "application/zip",
+            )
+        },
+        headers=manager.headers,
+    )
+    version_id = upload.json()["id"]
+
+    response = await client.post(
+        f"/api/v1/versions/{version_id}/publish", headers=manager.headers
+    )
+    assert response.status_code == 422
+    assert response.json()["type"].endswith("template_validation_failed")
+
+    rows = (
+        (
+            await session.execute(
+                select(AuditLog).where(
+                    AuditLog.tenant_id  # ty: ignore[invalid-argument-type]
+                    == manager.tenant_id,
+                    AuditLog.action  # ty: ignore[invalid-argument-type]
+                    == "template.publish",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    [entry] = rows
+    assert entry.outcome == "error"
+    assert entry.error_code == "template_validation_failed"
+    assert entry.version_id == UUID(version_id)
+    assert entry.requested_fields == []
+
+
 # --- variant sync --------------------------------------------------------------
 
 
