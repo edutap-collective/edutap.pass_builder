@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: pass_builder
+      POSTGRES_PASSWORD: pass_builder
+      POSTGRES_DB: pass_builder
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pass_builder"]
+      interval: 5s
+      retries: 10
+
+  objectstore:
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_ACCESS_KEY: pass_builder
+      RUSTFS_SECRET_KEY: pass_builder
+    ports: ["9000:9000"]
+
+  app:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      EDUTAP_PASS_BUILDER_DATABASE_URL: postgresql+asyncpg://pass_builder:pass_builder@db/pass_builder
+      EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY: ${EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY}
+      EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL: http://data-provider
+      EDUTAP_PASS_BUILDER_OBJECTSTORE_ENDPOINT_URL: http://objectstore:9000
+      EDUTAP_PASS_BUILDER_OBJECTSTORE_ACCESS_KEY: pass_builder
+      EDUTAP_PASS_BUILDER_OBJECTSTORE_SECRET_KEY: pass_builder
+    ports: ["8000:8000"]
