@@ -120,21 +120,34 @@ async def create_credential(
     credentials: CredentialService = Depends(get_credential_service),  # noqa: B008
     session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> CredentialResponse:
-    """Generate an Apple key/CSR, or import a Google service account.
+    """Create a credential set by generating or importing key material.
 
-    Apple requires `common_name`; Google requires `issuer_id` and
-    `service_account_json`. Either missing is a `400 invalid_request`.
+    Apple either generates a fresh key from `common_name`, or imports an
+    existing pair from `private_key` + `certificate`. Google requires
+    `issuer_id` and `service_account_json`. A missing combination is a
+    `400 invalid_request`.
     """
     start = time.monotonic()
     async with audited(session, request, auth, "credential.create", start=start):
         if body.provider == Provider.APPLE:
-            if not body.common_name:
-                raise ProblemError(
-                    400, "invalid_request", "Apple credentials require common_name"
+            if body.private_key and body.certificate:
+                credential_set = await credentials.import_apple(
+                    auth.tenant_id,
+                    body.label,
+                    body.private_key.encode(),
+                    body.certificate.encode(),
                 )
-            credential_set = await credentials.create_apple(
-                auth.tenant_id, body.label, body.common_name
-            )
+            elif body.common_name:
+                credential_set = await credentials.create_apple(
+                    auth.tenant_id, body.label, body.common_name
+                )
+            else:
+                raise ProblemError(
+                    400,
+                    "invalid_request",
+                    "Apple credentials require common_name (to generate) or "
+                    "private_key and certificate (to import)",
+                )
         else:
             if not body.issuer_id or body.service_account_json is None:
                 raise ProblemError(
