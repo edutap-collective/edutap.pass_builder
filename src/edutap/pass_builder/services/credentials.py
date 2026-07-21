@@ -1,5 +1,6 @@
 """Credential set lifecycle: create, install, import, list and decrypt."""
 
+import json
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -144,7 +145,12 @@ class CredentialService:
         issuer_id: str,
     ) -> CredentialSet:
         """Import a Google service account JSON as an active credential set."""
-        info = parse_service_account(service_account_raw)
+        try:
+            info = parse_service_account(service_account_raw)
+        except (json.JSONDecodeError, KeyError, ValueError) as exc:
+            raise ProblemError(
+                422, "invalid_service_account", "Invalid service account file"
+            ) from exc
 
         credential_set = CredentialSet(
             tenant_id=tenant_id,
