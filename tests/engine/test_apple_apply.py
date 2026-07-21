@@ -5,7 +5,7 @@ from edutap.pass_builder.engine.spec import BoundValue, RuleSpec
 from edutap.pass_builder.models.enums import TargetKind, ValueType
 
 
-def bound(target_kind, target, value):  # noqa: ANN001, ANN002
+def bound(target_kind, target, value):
     return BoundValue(
         rule=RuleSpec(
             target_kind=target_kind,
@@ -52,3 +52,21 @@ def test_nfc_payload_within_limit_is_written():
     bound_val = bound(TargetKind.NFC_PAYLOAD, "", "token")
     result, _ = apply_apple(base_pass(), {}, [bound_val])
     assert result["nfc"]["message"] == "token"
+
+
+def test_field_label_is_written_by_key():
+    bound_val = bound(TargetKind.FIELD_LABEL, "name", "Updated Name")
+    result, _ = apply_apple(base_pass(), {}, [bound_val])
+    assert result["generic"]["primaryFields"][0]["label"] == "Updated Name"
+
+
+def test_barcode_alt_text_is_written():
+    bound_val = bound(TargetKind.BARCODE_ALT_TEXT, "", "Alt text")
+    result, _ = apply_apple(base_pass(), {}, [bound_val])
+    assert result["barcodes"][0]["altText"] == "Alt text"
+
+
+def test_json_pointer_does_not_create_missing_intermediate_nodes():
+    bound_val = bound(TargetKind.JSON_POINTER, "/missing/child", "value")
+    with pytest.raises(KeyError):
+        apply_apple(base_pass(), {}, [bound_val])
