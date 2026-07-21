@@ -29,3 +29,12 @@ async def test_connection_error_becomes_502_problem():
         with pytest.raises(ProblemError) as excinfo:
             await make_client(http).fetch_fields("u1", ["person.name"])
     assert excinfo.value.slug == "data_provider_unavailable"
+
+
+@respx.mock
+async def test_catalogue_connection_error_becomes_502_problem():
+    respx.get("http://dp/catalogue").mock(side_effect=httpx.ConnectError("down"))
+    async with httpx.AsyncClient() as http:
+        with pytest.raises(ProblemError) as excinfo:
+            await make_client(http).fetch_catalogue()
+    assert excinfo.value.slug == "data_provider_unavailable"

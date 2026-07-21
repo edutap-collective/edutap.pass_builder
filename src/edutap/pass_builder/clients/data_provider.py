@@ -73,17 +73,37 @@ class DataProviderClient:
                     "Data provider unavailable",
                 )
             return response.json()
+        # Guaranteed to never reach here: each iteration either returns, continues
+        # to the next attempt, or raises. On attempt=2, a ConnectError raises
+        # without continuing, so we always exit. Required for type completeness.
         raise ProblemError(
             502,
             "data_provider_unavailable",
             "Data provider unavailable",
-        )
+        )  # pragma: no cover
 
     async def fetch_catalogue(self) -> list[CatalogueField]:
-        """Return the field catalogue offered by the data provider."""
-        response = await self._client.get(
-            f"{self._base_url}/catalogue",
-            headers=self._headers,
-            timeout=self._timeout,
-        )
+        """Return the field catalogue offered by the data provider.
+
+        Raises ProblemError(502, "data_provider_unavailable") on connection
+        error or non-2xx response without leaking internal details.
+        """
+        try:
+            response = await self._client.get(
+                f"{self._base_url}/catalogue",
+                headers=self._headers,
+                timeout=self._timeout,
+            )
+        except httpx.ConnectError:
+            raise ProblemError(
+                502,
+                "data_provider_unavailable",
+                "Data provider unavailable",
+            ) from None
+        if response.status_code >= 400:
+            raise ProblemError(
+                502,
+                "data_provider_unavailable",
+                "Data provider unavailable",
+            )
         return [CatalogueField(**row) for row in response.json()]
