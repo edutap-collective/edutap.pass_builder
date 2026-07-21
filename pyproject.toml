@@ -45,6 +45,8 @@ packages = ["src/edutap"]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 markers = [
     "integration: needs docker compose services and a test certificate",
 ]
