@@ -1,6 +1,12 @@
 """Apply bound values to a Google wallet object template."""
 
-from .placeholders import resolve_placeholders
+# Prefer the upstreamed resolver from edutap.wallet_google if available;
+# fall back to the local module (source of truth until wallet_google ships).
+try:
+    from edutap.wallet_google.placeholders import resolve_placeholders  # ty: ignore[unresolved-import]
+except ImportError:
+    from .placeholders import resolve_placeholders
+
 from .spec import BoundValue
 
 
