@@ -179,6 +179,10 @@ class CreateCredentialRequest(BaseModel):
     label: str
     common_name: str | None = None
     """Apple only: the CSR subject common name for `create_apple`."""
+    private_key: str | None = None
+    """Apple only: PEM private key to import an existing key/certificate pair."""
+    certificate: str | None = None
+    """Apple only: PEM signing certificate matching `private_key`."""
     issuer_id: str | None = None
     """Google only: the Google Wallet issuer id."""
     service_account_json: dict[str, Any] | None = None

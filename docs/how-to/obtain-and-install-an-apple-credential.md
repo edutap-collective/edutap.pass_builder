@@ -104,14 +104,28 @@ This marks the credential set `revoked`.
 It is never a hard delete: the audit trail of every pass signed with it
 stays intact.
 
-```{note}
-Importing an existing private key together with its certificate — the
-common case when migrating an existing certificate stock — is not yet
-exposed through the REST API.
-`CredentialService.import_apple` implements it at the service layer, for
-use in operator tooling and data migrations that run inside the service
-process; there is no `POST /credentials` request shape for it today.
+## Import an existing key and certificate
+
+When you already hold a private key and its signed certificate — the common
+case when migrating an existing certificate stock — `POST /credentials`
+imports the pair directly, without going through the generate-CSR flow. Send
+both PEM blocks in the body; the credential set is created `active` in one
+step.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/credentials \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+        --arg key "$(cat signing_key.pem)" \
+        --arg cert "$(cat signing_cert.pem)" \
+        '{provider: "apple", label: "imported", private_key: $key, certificate: $cert}')"
 ```
+
+The service verifies the certificate matches the private key before storing
+anything; a mismatch is rejected with `409 certificate_key_mismatch`. The
+imported private key never leaves the service — no response, log, or audit
+entry ever contains it.
 
 ```{seealso}
 {doc}`/how-to/configure-credentials-and-wwdr` for how the Apple WWDR

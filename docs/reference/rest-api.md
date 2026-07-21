@@ -152,17 +152,12 @@ configured with `409 google_credentials_missing`.
 
 No endpoint here ever returns secret material — not the private key, not
 the service account JSON — to any scope.
-`POST /credentials` needs `common_name` for `provider: apple`, or
-`issuer_id` and `service_account_json` for `provider: google`; either
-missing is `400 invalid_request`.
-
-```{note}
-Importing an existing Apple key and certificate pair (as opposed to
-generating a fresh key through this endpoint) is implemented at the
-service layer only — see
-{doc}`/how-to/obtain-and-install-an-apple-credential` — and is not yet
-reachable through `POST /credentials`.
-```
+`POST /credentials` accepts, for `provider: apple`, either `common_name`
+(generate a fresh key and CSR) or `private_key` + `certificate` (import an
+existing pair); for `provider: google` it needs `issuer_id` and
+`service_account_json`. A missing combination is `400 invalid_request`, and
+an imported certificate that does not match its key is
+`409 certificate_key_mismatch`.
 
 Full lifecycle walkthrough: {doc}`/how-to/obtain-and-install-an-apple-credential`.
 

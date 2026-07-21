@@ -11,6 +11,8 @@ from edutap.pass_builder.models.enums import Scope
 from .conftest import seed_client
 
 _APPLE_CERT = Path(__file__).parent.parent / "fixtures" / "apple_cert.pem"
+_TEST_KEY = Path(__file__).parent.parent / "fixtures" / "test_signing_key.pem"
+_TEST_CERT = Path(__file__).parent.parent / "fixtures" / "test_signing_cert.pem"
 
 _SERVICE_ACCOUNT = {
     "client_email": "svc@proj.iam.gserviceaccount.com",
@@ -59,6 +61,64 @@ async def test_create_apple_credential_yields_key_pending(client, session):
     body = response.json()
     assert body["status"] == "key_pending"
     assert body["provider"] == "apple"
+
+
+async def test_import_apple_credential_with_key_and_cert(client, session):
+    creds_client = await seed_client(session, [Scope.CREDENTIALS])
+
+    response = await client.post(
+        "/api/v1/credentials",
+        json={
+            "provider": "apple",
+            "label": "imported",
+            "private_key": _TEST_KEY.read_text(),
+            "certificate": _TEST_CERT.read_text(),
+        },
+        headers=creds_client.headers,
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "active"
+    assert body["pass_type_identifier"] == "pass.test.local"  # noqa: S105
+    # the imported key material must never appear in the response
+    assert "PRIVATE KEY" not in response.text
+
+
+async def test_import_apple_credential_rejects_mismatched_cert(client, session):
+    creds_client = await seed_client(session, [Scope.CREDENTIALS])
+
+    response = await client.post(
+        "/api/v1/credentials",
+        json={
+            "provider": "apple",
+            "label": "mismatch",
+            "private_key": _TEST_KEY.read_text(),
+            "certificate": _APPLE_CERT.read_text(),
+        },
+        headers=creds_client.headers,
+    )
+    assert response.status_code == 409
+    assert response.json()["type"].endswith("certificate_key_mismatch")
+
+
+async def test_import_apple_credential_is_audited(client, session):
+    creds_client = await seed_client(session, [Scope.CREDENTIALS])
+
+    await client.post(
+        "/api/v1/credentials",
+        json={
+            "provider": "apple",
+            "label": "imported",
+            "private_key": _TEST_KEY.read_text(),
+            "certificate": _TEST_CERT.read_text(),
+        },
+        headers=creds_client.headers,
+    )
+    entries = (await session.execute(select(AuditLog))).scalars().all()
+    actions = {entry.action for entry in entries}
+    assert "credential.create" in actions
+    for entry in entries:
+        assert "PRIVATE KEY" not in str(entry.details)
 
 
 async def test_create_google_credential_imports_service_account(client, session):
