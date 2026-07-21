@@ -343,6 +343,69 @@ async def test_publish_requires_nfc_capable_credential_set(session, objectstore)
     assert any("nfc" in f.lower() for f in excinfo.value.extra["findings"])
 
 
+async def test_publish_rejects_mapping_target_missing_from_pass(session, objectstore):
+    seeded = await seed_variant(session, wallet_type=WalletType.APPLE)
+    version = TemplateVersion(
+        variant_id=seeded.variant_id,
+        number=1,
+        status=VersionStatus.DRAFT,
+        pass_json={
+            "formatVersion": 1,
+            "generic": {"primaryFields": [{"key": "name", "value": ""}]},
+        },
+    )
+    session.add(version)
+    session.add(DataField(key="person.name", value_type=ValueType.TEXT, label="Name"))
+    await session.flush()
+    svc = TemplateService(session, objectstore)
+    await svc._store_asset(  # noqa: SLF001 - inject the icon without a full bundle
+        seeded.tenant_id, version, "icon.png", b"\x89PNG"
+    )
+    await svc.set_mappings(
+        seeded.tenant_id,
+        version.id,
+        [
+            RuleSpec(
+                target_kind=TargetKind.FIELD_VALUE,
+                target="nonexistent_key",
+                source_field="person.name",
+                value_type=ValueType.TEXT,
+            )
+        ],
+    )
+
+    with pytest.raises(ProblemError) as excinfo:
+        await svc.publish(seeded.tenant_id, version.id)
+    assert excinfo.value.slug == "template_validation_failed"
+    findings = excinfo.value.extra["findings"]
+    assert any("nonexistent_key" in f for f in findings)
+
+
+async def test_publish_accepts_mapping_target_present_in_pass(session, objectstore):
+    seeded = await seed_variant(session, wallet_type=WalletType.APPLE)
+    version = TemplateVersion(
+        variant_id=seeded.variant_id,
+        number=1,
+        status=VersionStatus.DRAFT,
+        pass_json={
+            "formatVersion": 1,
+            "generic": {"primaryFields": [{"key": "name", "value": ""}]},
+        },
+    )
+    session.add(version)
+    session.add(DataField(key="person.name", value_type=ValueType.TEXT, label="Name"))
+    await session.flush()
+    svc = TemplateService(session, objectstore)
+    await svc._store_asset(  # noqa: SLF001 - inject the icon without a full bundle
+        seeded.tenant_id, version, "icon.png", b"\x89PNG"
+    )
+    await svc.set_mappings(seeded.tenant_id, version.id, [a_rule()])
+
+    published = await svc.publish(seeded.tenant_id, version.id)
+
+    assert published.status == VersionStatus.PUBLISHED
+
+
 async def test_publish_derives_google_rules_from_placeholders(session, objectstore):
     seeded = await seed_variant(session, wallet_type=WalletType.GOOGLE)
     version = TemplateVersion(

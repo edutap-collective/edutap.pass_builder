@@ -31,6 +31,20 @@ _TOOLING_JSON = "tooling.json"
 _PASS_JSON = "pass.json"  # noqa: S105 - a filename, not a credential
 _APPLE_ICON = "icon.png"
 
+# Mirrors `_FIELD_GROUPS`/`_STYLES` in `engine/apple_apply.py`: the field
+# groups and pass style blocks Apple's pass.json can hold. Kept as a local
+# copy rather than importing those (module-private) names across modules.
+_APPLE_FIELD_GROUPS = (
+    "headerFields",
+    "primaryFields",
+    "secondaryFields",
+    "auxiliaryFields",
+    "backFields",
+)
+_APPLE_STYLES = ("boardingPass", "coupon", "eventTicket", "generic", "storeCard")
+
+_FIELD_TARGET_KINDS = (TargetKind.FIELD_VALUE, TargetKind.FIELD_LABEL)
+
 
 class SupportsObjectStore(Protocol):
     """The subset of `ObjectStore` this service depends on.
@@ -51,6 +65,27 @@ class SupportsObjectStore(Protocol):
     async def get(self, key: str) -> bytes:
         """Retrieve the blob stored under the given key."""
         ...
+
+
+def _apple_field_keys(pass_json: dict) -> set[str]:
+    """Return every field `key` found across an Apple pass.json's field groups.
+
+    Walks every pass style block (`boardingPass`, `coupon`, `eventTicket`,
+    `generic`, `storeCard`) and every standard field group within it
+    (`headerFields`, `primaryFields`, `secondaryFields`, `auxiliaryFields`,
+    `backFields`), collecting the `key` of each field entry.
+    """
+    keys: set[str] = set()
+    for style in _APPLE_STYLES:
+        style_block = pass_json.get(style)
+        if not isinstance(style_block, dict):
+            continue
+        for group in _APPLE_FIELD_GROUPS:
+            for field in style_block.get(group, []):
+                key = field.get("key")
+                if key is not None:
+                    keys.add(key)
+    return keys
 
 
 def _mapping_rule_to_spec(row: MappingRule) -> RuleSpec:
@@ -299,6 +334,7 @@ class TemplateService:
             filenames = {asset.filename for asset in await self.list_assets(version.id)}
             if _APPLE_ICON not in filenames:
                 problems.append(f"missing required asset: {_APPLE_ICON}")
+            problems.extend(self._check_apple_mapping_targets(version, authored_rules))
 
         if version.nfc_enabled:
             problems.extend(await self._check_nfc_capable(variant))
@@ -331,6 +367,24 @@ class TemplateService:
             if version.pass_json is not None:
                 problems.append("google variant must not set pass_json")
         return problems
+
+    def _check_apple_mapping_targets(
+        self, version: TemplateVersion, rules: list[RuleSpec]
+    ) -> list[str]:
+        """Check that every field-targeting rule points at a real pass field.
+
+        A `field_value`/`field_label` rule whose `target` is not a field
+        `key` anywhere in `pass_json` would silently render a blank field,
+        so it is a publish-time error rather than a runtime surprise.
+        """
+        if version.pass_json is None:
+            return []
+        field_keys = _apple_field_keys(version.pass_json)
+        return [
+            f"mapping target field not found in pass: {rule.target}"
+            for rule in rules
+            if rule.target_kind in _FIELD_TARGET_KINDS and rule.target not in field_keys
+        ]
 
     async def _check_nfc_capable(self, variant: TemplateVariant) -> list[str]:
         """Check the variant's credential set supports NFC when required."""
