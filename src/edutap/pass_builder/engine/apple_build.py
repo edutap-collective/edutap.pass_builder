@@ -1,5 +1,6 @@
 """Assemble and sign an Apple .pkpass from a render spec."""
 
+import copy
 from collections.abc import Callable
 
 from edutap.wallet_apple import api
@@ -15,7 +16,7 @@ def build_apple(
     sign: Callable[[object], None],
 ) -> bytes:
     """Return signed .pkpass bytes for the given spec and bound values."""
-    pass_json = dict(spec.pass_json or {})
+    pass_json = copy.deepcopy(spec.pass_json or {})
     pass_json["serialNumber"] = serial_number
     if spec.nfc_enabled:
         nfc = pass_json.setdefault("nfc", {})
