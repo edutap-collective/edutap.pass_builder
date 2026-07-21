@@ -27,6 +27,7 @@ from edutap.pass_builder.models.db import (
     Tenant,
 )
 from edutap.pass_builder.models.enums import (
+    Provider,
     RuleOrigin,
     Scope,
     TargetKind,
@@ -586,3 +587,103 @@ async def test_preview_uses_provided_sample_data_over_placeholder(render_env):
 
     value = preview["pass_json"]["generic"]["primaryFields"][0]["value"]
     assert value == "Grace Hopper"
+
+
+# --- unexpected failures / tenant-scoped credentials --------------------------
+
+
+async def test_unexpected_error_writes_audit_and_becomes_500(session):
+    """A non-`ProblemError` failure still audits and surfaces as a 500.
+
+    Any exception during resolve->fetch->bind->build/push -- not just a
+    `ProblemError` -- must leave an audit trail and never leak the original
+    exception message (it could carry secret/PII material) to the caller or
+    the audit entry.
+    """
+    tenant, api_client = await _seed_tenant_and_client(session)
+    await _seed_published_apple_template(session, tenant.id)
+    objectstore = FakeObjectStore()
+    data_provider = FakeDataProvider(response={"person.name": "Ada Lovelace"})
+
+    def _boom_sign(pkpass: object) -> None:
+        raise RuntimeError("boom")
+
+    service = _make_service(session, objectstore, data_provider, apple_sign=_boom_sign)
+    auth = AuthContext(
+        client_id=api_client.id, tenant_id=tenant.id, scopes={Scope.RENDER}
+    )
+
+    with pytest.raises(ProblemError) as excinfo:
+        await service.create_pass(
+            auth,
+            pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
+            template_key="student-id",
+            wallet_type=WalletType.APPLE,
+            variant_key=None,
+            person_uid="u1",
+            version_number=None,
+        )
+
+    assert excinfo.value.status == 500
+    assert excinfo.value.slug == "internal_error"
+    assert "boom" not in (excinfo.value.detail or "")
+
+    query = (
+        select(AuditLog)
+        .where(AuditLog.tenant_id == tenant.id)  # ty: ignore[invalid-argument-type]
+        .order_by(AuditLog.ts)  # ty: ignore[invalid-argument-type]
+    )
+    entries = list((await session.execute(query)).scalars().all())
+    last = entries[-1]
+    assert last.outcome == "error"
+    assert last.error_code == "internal_error"
+    assert "boom" not in str(last.error_code)
+    assert "boom" not in str(last.details)
+    assert "boom" not in str(last.requested_fields)
+    assert "boom" not in str(last.subject_ref)
+
+
+async def test_credential_from_other_tenant_is_not_used(session):
+    """A variant's `credential_set_id` from another tenant must not resolve.
+
+    The credential set lookup on the render path is tenant-scoped, so even
+    if a variant's `credential_set_id` happens to reference a credential set
+    belonging to a different tenant, rendering must fail closed with a
+    generic 404 rather than sign with someone else's key material.
+    """
+    tenant_a, api_client_a = await _seed_tenant_and_client(session)
+    variant = await _seed_published_apple_template(session, tenant_a.id)
+
+    tenant_b, _api_client_b = await _seed_tenant_and_client(session)
+    credential_set_b = CredentialSet(
+        tenant_id=tenant_b.id, provider=Provider.APPLE, label="tenant-b-cred"
+    )
+    session.add(credential_set_b)
+    await session.flush()
+
+    variant.credential_set_id = credential_set_b.id
+    session.add(variant)
+    await session.flush()
+
+    objectstore = FakeObjectStore()
+    data_provider = FakeDataProvider(response={"person.name": "Ada Lovelace"})
+    # No `apple_sign` override: the override would short-circuit the
+    # credential lookup this test exists to exercise.
+    service = _make_service(session, objectstore, data_provider, apple_sign=None)
+    auth = AuthContext(
+        client_id=api_client_a.id, tenant_id=tenant_a.id, scopes={Scope.RENDER}
+    )
+
+    with pytest.raises(ProblemError) as excinfo:
+        await service.create_pass(
+            auth,
+            pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
+            template_key="student-id",
+            wallet_type=WalletType.APPLE,
+            variant_key=None,
+            person_uid="u1",
+            version_number=None,
+        )
+
+    assert excinfo.value.status == 404
+    assert excinfo.value.slug == "credential_not_found"

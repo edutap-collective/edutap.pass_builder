@@ -201,7 +201,9 @@ class RenderService:
         _template, variant, _version = await self._resolve(
             auth.tenant_id, template_key, wallet_type, variant_key, version_number
         )
-        credential_set = await self._load_credential_set(variant.credential_set_id)
+        credential_set = await self._load_credential_set(
+            auth.tenant_id, variant.credential_set_id
+        )
         if credential_set is None or credential_set.issuer_id is None:
             raise ProblemError(
                 409,
@@ -294,26 +296,48 @@ class RenderService:
             bound = self._bind_or_raise(spec.rules, data)
 
             result = await self._build_and_deliver(
-                spec, variant, version, bound, pass_id, is_update=is_update
+                auth.tenant_id,
+                spec,
+                variant,
+                version,
+                bound,
+                pass_id,
+                is_update=is_update,
             )
         except ProblemError as exc:
-            await write_audit(
-                self._session,
-                tenant_id=auth.tenant_id,
+            await self._write_error_audit(
+                auth=auth,
                 request_id=request_id,
-                actor_client_id=auth.client_id,
                 action=action,
-                outcome="error",
                 error_code=exc.slug,
-                duration_ms=_elapsed_ms(start),
+                start=start,
                 template_id=template_id,
                 variant_id=variant_id,
                 version_id=version_id,
                 wallet_type=wallet_type,
-                subject_ref=person_uid,
-                requested_fields=fields,
+                person_uid=person_uid,
+                fields=fields,
             )
             raise
+        except Exception as exc:
+            # Anything unexpected -- a JSON decode error, a network failure
+            # from the Google push, a SQLAlchemy error -- must still leave an
+            # audit trail. The original message is never audited or surfaced
+            # (it could carry secret/PII material); only a generic slug is.
+            await self._write_error_audit(
+                auth=auth,
+                request_id=request_id,
+                action=action,
+                error_code="internal_error",
+                start=start,
+                template_id=template_id,
+                variant_id=variant_id,
+                version_id=version_id,
+                wallet_type=wallet_type,
+                person_uid=person_uid,
+                fields=fields,
+            )
+            raise ProblemError(500, "internal_error", "Internal error") from exc
 
         await write_audit(
             self._session,
@@ -333,6 +357,39 @@ class RenderService:
         )
         return result
 
+    async def _write_error_audit(
+        self,
+        *,
+        auth: AuthContext,
+        request_id: str,
+        action: str,
+        error_code: str,
+        start: float,
+        template_id: UUID | None,
+        variant_id: UUID | None,
+        version_id: UUID | None,
+        wallet_type: WalletType,
+        person_uid: str,
+        fields: list[str],
+    ) -> None:
+        """Write one `outcome="error"` audit entry for `_render`'s except clauses."""
+        await write_audit(
+            self._session,
+            tenant_id=auth.tenant_id,
+            request_id=request_id,
+            actor_client_id=auth.client_id,
+            action=action,
+            outcome="error",
+            error_code=error_code,
+            duration_ms=_elapsed_ms(start),
+            template_id=template_id,
+            variant_id=variant_id,
+            version_id=version_id,
+            wallet_type=wallet_type,
+            subject_ref=person_uid,
+            requested_fields=fields,
+        )
+
     @staticmethod
     def _bind_or_raise(rules: list[RuleSpec], data: dict[str, Any]) -> list[BoundValue]:
         """Bind the rules against fetched data, translating missing fields."""
@@ -348,6 +405,7 @@ class RenderService:
 
     async def _build_and_deliver(
         self,
+        tenant_id: UUID,
         spec: RenderSpec,
         variant: TemplateVariant,
         version: TemplateVersion,
@@ -358,7 +416,7 @@ class RenderService:
     ) -> RenderResult:
         """Build the platform payload and deliver it (sign, or push to Google)."""
         if spec.wallet_type == WalletType.APPLE:
-            sign = await self._apple_signer(variant.credential_set_id)
+            sign = await self._apple_signer(tenant_id, variant.credential_set_id)
             pkpass = build_apple(spec, bound, serial_number=pass_id, sign=sign)
             return RenderResult(
                 wallet_type=WalletType.APPLE,
@@ -380,7 +438,9 @@ class RenderService:
                     "google_class_not_configured",
                     "Variant has no Google class id configured",
                 )
-            credential_set = await self._load_credential_set(variant.credential_set_id)
+            credential_set = await self._load_credential_set(
+                tenant_id, variant.credential_set_id
+            )
             credentials = await self._open_google_credentials(credential_set)
 
             object_id = google_object_id(spec.issuer_id, pass_id)
@@ -410,7 +470,7 @@ class RenderService:
         )
 
     async def _apple_signer(
-        self, credential_set_id: UUID | None
+        self, tenant_id: UUID, credential_set_id: UUID | None
     ) -> Callable[[object], None]:
         """Return the callable that signs a `PkPass` in place.
 
@@ -421,7 +481,7 @@ class RenderService:
         """
         if self._apple_sign_override is not None:
             return self._apple_sign_override
-        credential_set = await self._load_credential_set(credential_set_id)
+        credential_set = await self._load_credential_set(tenant_id, credential_set_id)
         if credential_set is None or not credential_set.certificate_pem:
             raise ProblemError(
                 409,
@@ -446,12 +506,33 @@ class RenderService:
         return json.loads(material)
 
     async def _load_credential_set(
-        self, credential_set_id: UUID | None
+        self, tenant_id: UUID, credential_set_id: UUID | None
     ) -> CredentialSet | None:
-        """Return the credential set for an id, or `None` if unset/missing."""
+        """Return the tenant-scoped credential set for an id, or `None` if unset.
+
+        Tenant-scoped defense in depth on the key/cert path: a variant's
+        `credential_set_id` is trusted data, but this still refuses to hand
+        back a credential set belonging to a different tenant. Raises
+        `ProblemError(404, "credential_not_found")` rather than silently
+        returning `None` when an id is set but does not resolve for this
+        tenant, so a stale or mismatched id fails loudly instead of falling
+        through to a generic "not configured" path.
+        """
         if credential_set_id is None:
             return None
-        return await self._session.get(CredentialSet, credential_set_id)
+        credential_set = (
+            await self._session.execute(
+                select(CredentialSet).where(
+                    CredentialSet.id  # ty: ignore[invalid-argument-type]
+                    == credential_set_id,
+                    CredentialSet.tenant_id  # ty: ignore[invalid-argument-type]
+                    == tenant_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if credential_set is None:
+            raise ProblemError(404, "credential_not_found", "Credential not found")
+        return credential_set
 
     async def _resolve(
         self,

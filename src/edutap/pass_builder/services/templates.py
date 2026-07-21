@@ -213,7 +213,7 @@ class TemplateService:
         variant = await self._session.get(TemplateVariant, version.variant_id)
         assert variant is not None  # noqa: S101 - FK guarantees existence
 
-        problems = await self._validate_for_publish(version, variant)
+        problems = await self._validate_for_publish(tenant_id, version, variant)
         if problems:
             raise ProblemError(
                 422,
@@ -279,8 +279,8 @@ class TemplateService:
 
         issuer_id: str | None = None
         if wallet_type == WalletType.GOOGLE and variant.credential_set_id is not None:
-            credential_set = await self._session.get(
-                CredentialSet, variant.credential_set_id
+            credential_set = await self._load_credential_set(
+                tenant_id, variant.credential_set_id
             )
             if credential_set is not None:
                 issuer_id = credential_set.issuer_id
@@ -318,7 +318,7 @@ class TemplateService:
         )
 
     async def _validate_for_publish(
-        self, version: TemplateVersion, variant: TemplateVariant
+        self, tenant_id: UUID, version: TemplateVersion, variant: TemplateVariant
     ) -> list[str]:
         """Run every publish-time check, returning all findings at once."""
         problems: list[str] = []
@@ -337,7 +337,7 @@ class TemplateService:
             problems.extend(self._check_apple_mapping_targets(version, authored_rules))
 
         if version.nfc_enabled:
-            problems.extend(await self._check_nfc_capable(variant))
+            problems.extend(await self._check_nfc_capable(tenant_id, variant))
 
         return problems
 
@@ -386,16 +386,35 @@ class TemplateService:
             if rule.target_kind in _FIELD_TARGET_KINDS and rule.target not in field_keys
         ]
 
-    async def _check_nfc_capable(self, variant: TemplateVariant) -> list[str]:
+    async def _check_nfc_capable(
+        self, tenant_id: UUID, variant: TemplateVariant
+    ) -> list[str]:
         """Check the variant's credential set supports NFC when required."""
         credential_set = None
         if variant.credential_set_id is not None:
-            credential_set = await self._session.get(
-                CredentialSet, variant.credential_set_id
+            credential_set = await self._load_credential_set(
+                tenant_id, variant.credential_set_id
             )
         if credential_set is None or not credential_set.nfc_capable:
             return ["nfc_enabled requires an nfc_capable credential set"]
         return []
+
+    async def _load_credential_set(
+        self, tenant_id: UUID, credential_set_id: UUID
+    ) -> CredentialSet | None:
+        """Return the tenant-scoped credential set for an id, or `None` if absent.
+
+        Tenant-scoped so a variant's `credential_set_id` can never resolve
+        another tenant's credential set here -- defense in depth alongside
+        the render path's own tenant-scoped lookup.
+        """
+        query = select(CredentialSet).where(
+            CredentialSet.id  # ty: ignore[invalid-argument-type]
+            == credential_set_id,
+            CredentialSet.tenant_id  # ty: ignore[invalid-argument-type]
+            == tenant_id,
+        )
+        return (await self._session.execute(query)).scalar_one_or_none()
 
     async def _replace_rules(
         self, version_id: UUID, rules: list[RuleSpec], *, origin: RuleOrigin
