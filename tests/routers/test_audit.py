@@ -1,12 +1,13 @@
 """Tests for the audit log endpoint: tenant scoping and pagination.
 
-The audit table grows with every render, so `GET /api/v1/audit` must never
-return an unbounded result set -- see `routers/audit.py::list_audit`'s
+The audit table grows with every render, so `GET {API_PREFIX}/audit` must
+never return an unbounded result set -- see `routers/audit.py::list_audit`'s
 `limit`/`offset` query params.
 """
 
 from datetime import UTC, datetime, timedelta
 
+from edutap.pass_builder.app import API_PREFIX
 from edutap.pass_builder.models.db import AuditLog
 from edutap.pass_builder.models.enums import Scope
 
@@ -50,7 +51,7 @@ async def test_list_audit_returns_every_row_under_the_default_limit(client, sess
     manager = await seed_client(session, [Scope.MANAGE])
     await _add_audit_rows(session, manager.tenant_id, 5)
 
-    response = await client.get("/api/v1/audit", headers=manager.headers)
+    response = await client.get(f"{API_PREFIX}/audit", headers=manager.headers)
 
     assert response.status_code == 200
     assert len(response.json()) == 5
@@ -62,7 +63,7 @@ async def test_list_audit_limit_caps_the_result_set(client, session):
     await _add_audit_rows(session, manager.tenant_id, 10)
 
     response = await client.get(
-        "/api/v1/audit", params={"limit": 3}, headers=manager.headers
+        f"{API_PREFIX}/audit", params={"limit": 3}, headers=manager.headers
     )
 
     assert response.status_code == 200
@@ -75,7 +76,7 @@ async def test_list_audit_orders_newest_first_under_a_limit(client, session):
     await _add_audit_rows(session, manager.tenant_id, 5)
 
     response = await client.get(
-        "/api/v1/audit", params={"limit": 2}, headers=manager.headers
+        f"{API_PREFIX}/audit", params={"limit": 2}, headers=manager.headers
     )
 
     request_ids = [entry["request_id"] for entry in response.json()]
@@ -89,14 +90,14 @@ async def test_list_audit_offset_pages_past_the_first_results(client, session):
 
     first_page = (
         await client.get(
-            "/api/v1/audit",
+            f"{API_PREFIX}/audit",
             params={"limit": 2, "offset": 0},
             headers=manager.headers,
         )
     ).json()
     second_page = (
         await client.get(
-            "/api/v1/audit",
+            f"{API_PREFIX}/audit",
             params={"limit": 2, "offset": 2},
             headers=manager.headers,
         )
@@ -111,7 +112,7 @@ async def test_list_audit_rejects_a_limit_over_the_maximum(client, session):
     manager = await seed_client(session, [Scope.MANAGE])
 
     response = await client.get(
-        "/api/v1/audit", params={"limit": 1001}, headers=manager.headers
+        f"{API_PREFIX}/audit", params={"limit": 1001}, headers=manager.headers
     )
 
     assert response.status_code == 422
@@ -123,7 +124,7 @@ async def test_list_audit_only_shows_own_tenant(client, session):
     other = await seed_client(session, [Scope.MANAGE])
     await _add_audit_rows(session, other.tenant_id, 5)
 
-    response = await client.get("/api/v1/audit", headers=manager.headers)
+    response = await client.get(f"{API_PREFIX}/audit", headers=manager.headers)
 
     assert response.status_code == 200
     assert response.json() == []

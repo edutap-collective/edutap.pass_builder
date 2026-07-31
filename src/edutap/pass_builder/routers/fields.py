@@ -13,7 +13,7 @@ from ..models.db import DataField
 from ..models.enums import Scope
 from ..services.retention import refresh_catalogue
 
-router = APIRouter(prefix="/api/v1", tags=["fields"])
+router = APIRouter(tags=["fields"])
 
 
 def _to_response(field: DataField) -> FieldResponse:

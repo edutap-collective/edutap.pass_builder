@@ -7,6 +7,7 @@ tenant-scoped GET endpoint this task implements.
 
 import pytest
 
+from edutap.pass_builder.app import API_PREFIX
 from edutap.pass_builder.models.enums import Scope
 
 from .conftest import make_apple_bundle, seed_client
@@ -18,14 +19,14 @@ async def _owner_setup(client, session):
 
     template = (
         await client.post(
-            "/api/v1/templates",
+            f"{API_PREFIX}/templates",
             json={"key": "student-id", "name": "Student ID"},
             headers=owner.headers,
         )
     ).json()
     variant = (
         await client.post(
-            f"/api/v1/templates/{template['id']}/variants",
+            f"{API_PREFIX}/templates/{template['id']}/variants",
             json={
                 "key": "student",
                 "name": "Student",
@@ -37,7 +38,7 @@ async def _owner_setup(client, session):
     ).json()
     version = (
         await client.post(
-            f"/api/v1/variants/{variant['id']}/versions",
+            f"{API_PREFIX}/variants/{variant['id']}/versions",
             files={
                 "file": (
                     "b.pkpasstemplate",
@@ -50,7 +51,7 @@ async def _owner_setup(client, session):
     ).json()
     credential = (
         await client.post(
-            "/api/v1/credentials",
+            f"{API_PREFIX}/credentials",
             json={
                 "provider": "apple",
                 "label": "demo",
@@ -71,13 +72,13 @@ async def _owner_setup(client, session):
 @pytest.mark.parametrize(
     "path_template",
     [
-        "/api/v1/templates/{template}",
-        "/api/v1/variants/{variant}",
-        "/api/v1/versions/{version}",
-        "/api/v1/versions/{version}/mappings",
-        "/api/v1/templates/{template}/variants",
-        "/api/v1/variants/{variant}/versions",
-        "/api/v1/versions/{version}/assets/icon.png",
+        f"{API_PREFIX}/templates/{{template}}",
+        f"{API_PREFIX}/variants/{{variant}}",
+        f"{API_PREFIX}/versions/{{version}}",
+        f"{API_PREFIX}/versions/{{version}}/mappings",
+        f"{API_PREFIX}/templates/{{template}}/variants",
+        f"{API_PREFIX}/variants/{{variant}}/versions",
+        f"{API_PREFIX}/versions/{{version}}/assets/icon.png",
     ],
 )
 async def test_other_tenant_gets_404_on_manage_endpoints(
@@ -96,7 +97,7 @@ async def test_other_tenant_cannot_publish_foreign_version(client, session):
     other = await seed_client(session, [Scope.MANAGE])
 
     response = await client.post(
-        f"/api/v1/versions/{ids['version']}/publish", headers=other.headers
+        f"{API_PREFIX}/versions/{ids['version']}/publish", headers=other.headers
     )
     assert response.status_code == 404
 
@@ -106,7 +107,7 @@ async def test_other_tenant_cannot_modify_foreign_mappings(client, session):
     other = await seed_client(session, [Scope.MANAGE])
 
     response = await client.put(
-        f"/api/v1/versions/{ids['version']}/mappings",
+        f"{API_PREFIX}/versions/{ids['version']}/mappings",
         json={"rules": []},
         headers=other.headers,
     )
@@ -118,7 +119,7 @@ async def test_other_tenant_gets_404_on_credential_csr(client, session):
     other = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.get(
-        f"/api/v1/credentials/{ids['credential']}/csr", headers=other.headers
+        f"{API_PREFIX}/credentials/{ids['credential']}/csr", headers=other.headers
     )
     assert response.status_code == 404
 
@@ -128,7 +129,7 @@ async def test_other_tenant_gets_404_on_credential_revoke(client, session):
     other = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.delete(
-        f"/api/v1/credentials/{ids['credential']}", headers=other.headers
+        f"{API_PREFIX}/credentials/{ids['credential']}", headers=other.headers
     )
     assert response.status_code == 404
 
@@ -138,7 +139,7 @@ async def test_other_tenant_cannot_sync_foreign_variant(client, session):
     other = await seed_client(session, [Scope.MANAGE])
 
     response = await client.post(
-        f"/api/v1/variants/{ids['variant']}/sync", headers=other.headers
+        f"{API_PREFIX}/variants/{ids['variant']}/sync", headers=other.headers
     )
     assert response.status_code == 404
     assert response.status_code != 403
@@ -149,7 +150,7 @@ async def test_other_tenant_cannot_render_foreign_template(client, session):
     other = await seed_client(session, [Scope.RENDER])
 
     response = await client.post(
-        "/api/v1/passes",
+        f"{API_PREFIX}/passes",
         json={
             "pass_id": "1",
             "template": "student-id",

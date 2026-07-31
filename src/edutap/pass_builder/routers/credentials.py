@@ -28,7 +28,7 @@ from ..services.audit import elapsed_ms, write_audit
 from ..services.credentials import CredentialService
 from ._lifecycle_audit import audited
 
-router = APIRouter(prefix="/api/v1", tags=["credentials"])
+router = APIRouter(tags=["credentials"])
 
 _EXPIRING_WITHIN_RE = re.compile(r"^(\d+)d$")
 

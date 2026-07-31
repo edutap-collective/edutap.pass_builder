@@ -15,6 +15,7 @@ import os
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from edutap.pass_builder.app import API_PREFIX
 from edutap.pass_builder.dependencies import get_render_service
 from edutap.pass_builder.models.db import (
     DataField,
@@ -118,7 +119,7 @@ async def test_create_apple_pass_returns_pkpass_bytes_with_headers(
     data_provider.response = {"person.name": "Ada Lovelace"}
 
     response = await client.post(
-        "/api/v1/passes",
+        f"{API_PREFIX}/passes",
         json={
             "pass_id": "11111111-1111-1111-1111-111111111111",
             "template": "student-id",
@@ -140,7 +141,7 @@ async def test_create_pass_requires_render_scope(client, session):
     manager = await seed_client(session, [Scope.MANAGE])
 
     response = await client.post(
-        "/api/v1/passes",
+        f"{API_PREFIX}/passes",
         json={
             "pass_id": "1",
             "template": "student-id",
@@ -158,7 +159,7 @@ async def test_create_pass_missing_field_is_422(client, session, data_provider):
     data_provider.response = {}  # person.name missing
 
     response = await client.post(
-        "/api/v1/passes",
+        f"{API_PREFIX}/passes",
         json={
             "pass_id": "1",
             "template": "student-id",
@@ -176,7 +177,7 @@ async def test_preview_never_calls_data_provider(client, session, data_provider)
     await _seed_published_apple_template(session, renderer.tenant_id)
 
     response = await client.post(
-        "/api/v1/passes/preview",
+        f"{API_PREFIX}/passes/preview",
         json={
             "template": "student-id",
             "wallet_type": "apple",
@@ -198,7 +199,7 @@ async def test_update_pass_re_renders_same_serial(client, session, data_provider
     data_provider.response = {"person.name": "Ada Lovelace"}
 
     response = await client.put(
-        "/api/v1/passes/11111111-1111-1111-1111-111111111111",
+        f"{API_PREFIX}/passes/11111111-1111-1111-1111-111111111111",
         json={
             "template": "student-id",
             "wallet_type": "apple",

@@ -33,7 +33,7 @@ from ..services.credentials import CredentialService
 from ..services.templates import TemplateService
 from ._lifecycle_audit import audited
 
-router = APIRouter(prefix="/api/v1", tags=["templates"])
+router = APIRouter(tags=["templates"])
 
 
 async def _audit(

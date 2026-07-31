@@ -15,7 +15,7 @@ from ..models.api import (
 from ..models.enums import Scope, WalletType
 from ..services.render import RenderResult, RenderService
 
-router = APIRouter(prefix="/api/v1", tags=["passes"])
+router = APIRouter(tags=["passes"])
 
 _PKPASS_MEDIA_TYPE = "application/vnd.apple.pkpass"
 

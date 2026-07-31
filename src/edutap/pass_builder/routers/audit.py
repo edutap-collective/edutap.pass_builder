@@ -14,7 +14,7 @@ from ..models.api import AuditEntryResponse
 from ..models.db import AuditLog
 from ..models.enums import Scope
 
-router = APIRouter(prefix="/api/v1", tags=["audit"])
+router = APIRouter(tags=["audit"])
 
 
 def _to_response(entry: AuditLog) -> AuditEntryResponse:

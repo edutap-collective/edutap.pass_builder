@@ -5,6 +5,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
+from edutap.pass_builder.app import API_PREFIX
 from edutap.pass_builder.models.db import AuditLog
 from edutap.pass_builder.models.enums import Scope
 
@@ -32,7 +33,7 @@ async def test_create_apple_credential_requires_common_name(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.post(
-        "/api/v1/credentials",
+        f"{API_PREFIX}/credentials",
         json={"provider": "apple", "label": "demo"},
         headers=creds_client.headers,
     )
@@ -44,7 +45,7 @@ async def test_create_google_credential_requires_issuer_and_account(client, sess
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.post(
-        "/api/v1/credentials",
+        f"{API_PREFIX}/credentials",
         json={"provider": "google", "label": "demo"},
         headers=creds_client.headers,
     )
@@ -55,7 +56,7 @@ async def test_create_apple_credential_yields_key_pending(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.post(
-        "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+        f"{API_PREFIX}/credentials", json=_APPLE_BODY, headers=creds_client.headers
     )
     assert response.status_code == 201
     body = response.json()
@@ -67,7 +68,7 @@ async def test_import_apple_credential_with_key_and_cert(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.post(
-        "/api/v1/credentials",
+        f"{API_PREFIX}/credentials",
         json={
             "provider": "apple",
             "label": "imported",
@@ -88,7 +89,7 @@ async def test_import_apple_credential_rejects_mismatched_cert(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.post(
-        "/api/v1/credentials",
+        f"{API_PREFIX}/credentials",
         json={
             "provider": "apple",
             "label": "mismatch",
@@ -105,7 +106,7 @@ async def test_import_apple_credential_is_audited(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     await client.post(
-        "/api/v1/credentials",
+        f"{API_PREFIX}/credentials",
         json={
             "provider": "apple",
             "label": "imported",
@@ -125,7 +126,7 @@ async def test_create_google_credential_imports_service_account(client, session)
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.post(
-        "/api/v1/credentials",
+        f"{API_PREFIX}/credentials",
         json={
             "provider": "google",
             "label": "google-demo",
@@ -144,12 +145,12 @@ async def test_get_csr_returns_pem(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
     created = (
         await client.post(
-            "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+            f"{API_PREFIX}/credentials", json=_APPLE_BODY, headers=creds_client.headers
         )
     ).json()
 
     response = await client.get(
-        f"/api/v1/credentials/{created['id']}/csr", headers=creds_client.headers
+        f"{API_PREFIX}/credentials/{created['id']}/csr", headers=creds_client.headers
     )
     assert response.status_code == 200
     assert "CERTIFICATE REQUEST" in response.text
@@ -158,11 +159,11 @@ async def test_get_csr_returns_pem(client, session):
 async def test_list_credentials_filters_by_provider(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
     await client.post(
-        "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+        f"{API_PREFIX}/credentials", json=_APPLE_BODY, headers=creds_client.headers
     )
 
     response = await client.get(
-        "/api/v1/credentials?provider=google", headers=creds_client.headers
+        f"{API_PREFIX}/credentials?provider=google", headers=creds_client.headers
     )
     assert response.status_code == 200
     assert response.json() == []
@@ -172,17 +173,17 @@ async def test_revoke_credential_marks_revoked_never_deleted(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
     created = (
         await client.post(
-            "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+            f"{API_PREFIX}/credentials", json=_APPLE_BODY, headers=creds_client.headers
         )
     ).json()
 
     delete_response = await client.delete(
-        f"/api/v1/credentials/{created['id']}", headers=creds_client.headers
+        f"{API_PREFIX}/credentials/{created['id']}", headers=creds_client.headers
     )
     assert delete_response.status_code == 204
 
     listed = (
-        await client.get("/api/v1/credentials", headers=creds_client.headers)
+        await client.get(f"{API_PREFIX}/credentials", headers=creds_client.headers)
     ).json()
     [row] = [c for c in listed if c["id"] == created["id"]]
     assert row["status"] == "revoked"
@@ -192,12 +193,12 @@ async def test_renew_creates_successor_credential(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
     created = (
         await client.post(
-            "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+            f"{API_PREFIX}/credentials", json=_APPLE_BODY, headers=creds_client.headers
         )
     ).json()
 
     response = await client.post(
-        f"/api/v1/credentials/{created['id']}/renew", headers=creds_client.headers
+        f"{API_PREFIX}/credentials/{created['id']}/renew", headers=creds_client.headers
     )
     assert response.status_code == 200
     body = response.json()
@@ -208,7 +209,7 @@ async def test_renew_creates_successor_credential(client, session):
 async def test_scope_manage_cannot_use_credentials_endpoints(client, session):
     manager = await seed_client(session, [Scope.MANAGE])
 
-    response = await client.get("/api/v1/credentials", headers=manager.headers)
+    response = await client.get(f"{API_PREFIX}/credentials", headers=manager.headers)
     assert response.status_code == 403
 
 
@@ -216,7 +217,7 @@ async def test_credential_create_is_audited(client, session):
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
 
     response = await client.post(
-        "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+        f"{API_PREFIX}/credentials", json=_APPLE_BODY, headers=creds_client.headers
     )
     assert response.status_code == 201
 
@@ -259,12 +260,12 @@ async def test_credential_certificate_mismatch_is_audited_as_error(client, sessi
     creds_client = await seed_client(session, [Scope.CREDENTIALS])
     created = (
         await client.post(
-            "/api/v1/credentials", json=_APPLE_BODY, headers=creds_client.headers
+            f"{API_PREFIX}/credentials", json=_APPLE_BODY, headers=creds_client.headers
         )
     ).json()
 
     response = await client.put(
-        f"/api/v1/credentials/{created['id']}/certificate",
+        f"{API_PREFIX}/credentials/{created['id']}/certificate",
         json={"certificate_pem": _APPLE_CERT.read_text()},
         headers=creds_client.headers,
     )
