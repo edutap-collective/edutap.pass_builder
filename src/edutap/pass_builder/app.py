@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
         root_path=settings.base_path,
         docs_url=f"{API_PREFIX}/docs",
         openapi_url=f"{API_PREFIX}/openapi.json",
+        redoc_url=f"{API_PREFIX}/redoc",
         lifespan=lifespan,
     )
     install_error_handlers(app)

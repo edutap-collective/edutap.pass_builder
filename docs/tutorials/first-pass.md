@@ -125,7 +125,7 @@ certificate on disk.
 Import the matching key and certificate as an existing credential set.
 
 ```shell
-CREDENTIAL_ID=$(curl -s -X POST http://localhost:8000/api/v1/credentials \
+CREDENTIAL_ID=$(curl -s -X POST http://localhost:8000/internal-api/wallet/builder/v1/credentials \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"provider": "apple", "label": "tutorial", "common_name": "pass.tutorial.example"}' \
@@ -140,10 +140,10 @@ Fetch the CSR, have it signed through the Apple Developer portal (the
 how-to guide covers this), then install the resulting certificate.
 
 ```shell
-curl -s http://localhost:8000/api/v1/credentials/$CREDENTIAL_ID/csr \
+curl -s http://localhost:8000/internal-api/wallet/builder/v1/credentials/$CREDENTIAL_ID/csr \
   -H "Authorization: Bearer $TOKEN" > tutorial.csr
 
-curl -s -X PUT http://localhost:8000/api/v1/credentials/$CREDENTIAL_ID/certificate \
+curl -s -X PUT http://localhost:8000/internal-api/wallet/builder/v1/credentials/$CREDENTIAL_ID/certificate \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"certificate_pem\": $(python3 -c 'import json,sys; print(json.dumps(open("signed.pem").read()))')}"
@@ -159,13 +159,13 @@ A template is the logical credential — "student ID" — and a variant is one
 design for one wallet platform.
 
 ```shell
-TEMPLATE_ID=$(curl -s -X POST http://localhost:8000/api/v1/templates \
+TEMPLATE_ID=$(curl -s -X POST http://localhost:8000/internal-api/wallet/builder/v1/templates \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"key": "student-id", "name": "Student ID"}' \
   | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')
 
-VARIANT_ID=$(curl -s -X POST http://localhost:8000/api/v1/templates/$TEMPLATE_ID/variants \
+VARIANT_ID=$(curl -s -X POST http://localhost:8000/internal-api/wallet/builder/v1/templates/$TEMPLATE_ID/variants \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"key\": \"default\", \"name\": \"Default\", \"wallet_type\": \"apple\", \"is_default\": true, \"credential_set_id\": \"$CREDENTIAL_ID\"}" \
@@ -180,7 +180,7 @@ Follow {doc}`/how-to/import-a-pkpasstemplate` to build a
 Import it as a draft version of the variant you just created.
 
 ```shell
-VERSION_ID=$(curl -s -X POST http://localhost:8000/api/v1/variants/$VARIANT_ID/versions \
+VERSION_ID=$(curl -s -X POST http://localhost:8000/internal-api/wallet/builder/v1/variants/$VARIANT_ID/versions \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@student-id.pkpasstemplate" \
   | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')
@@ -189,7 +189,7 @@ VERSION_ID=$(curl -s -X POST http://localhost:8000/api/v1/variants/$VARIANT_ID/v
 The response has `"status": "draft"`.
 Notice that the service decomposed the bundle: `pass.json` became the
 version's content, and every image inside became a separate asset row you
-can inspect through `GET /api/v1/versions/$VERSION_ID/assets/icon.png`.
+can inspect through `GET /builder/v1/versions/$VERSION_ID/assets/icon.png`.
 
 ## Step 6: add a mapping rule and publish
 
@@ -200,7 +200,7 @@ Replace `name` below with the `key` of a field already present in your
 `pass.json`.
 
 ```shell
-curl -s -X PUT http://localhost:8000/api/v1/versions/$VERSION_ID/mappings \
+curl -s -X PUT http://localhost:8000/internal-api/wallet/builder/v1/versions/$VERSION_ID/mappings \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"rules": [{"target_kind": "field_value", "target": "name", "source_field": "person.name", "value_type": "text", "required": true}]}'
@@ -213,7 +213,7 @@ certificate must be valid — and, once it succeeds, the version becomes
 immutable.
 
 ```shell
-curl -s -X POST http://localhost:8000/api/v1/versions/$VERSION_ID/publish \
+curl -s -X POST http://localhost:8000/internal-api/wallet/builder/v1/versions/$VERSION_ID/publish \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -229,7 +229,7 @@ Before touching `data_provider`, preview the render.
 `pass.json`.
 
 ```shell
-curl -s -X POST http://localhost:8000/api/v1/passes/preview \
+curl -s -X POST http://localhost:8000/internal-api/wallet/builder/v1/passes/preview \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"template": "student-id", "wallet_type": "apple", "sample_data": {"person.name": "Ada Lovelace"}}'
@@ -242,7 +242,7 @@ Once the preview looks right, create the real pass, this time supplying a
 or stores this ID, your caller does.
 
 ```shell
-curl -s -X POST http://localhost:8000/api/v1/passes \
+curl -s -X POST http://localhost:8000/internal-api/wallet/builder/v1/passes \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"pass_id": "f2c1e9a0-1234-4a5b-8c6d-abcdef123456", "template": "student-id", "wallet_type": "apple", "person_uid": "ada"}' \
@@ -259,7 +259,7 @@ entirely from the certificate itself, imported and published an
 immutable template version, and rendered a signed pass without ever
 touching Apple's signing tools directly.
 Every step you ran is now in the audit log, retrievable through
-`GET /api/v1/audit`.
+`GET /builder/v1/audit`.
 
 From here, {doc}`/reference/rest-api` documents every endpoint you used
 and the ones you did not, and {doc}`/explanation/why-immutable-versions`

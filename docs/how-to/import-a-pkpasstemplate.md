@@ -24,7 +24,7 @@ You do not need to remove it: the import step strips it automatically.
 ## Import as a draft version
 
 ```shell
-curl -X POST https://pass-builder.example/api/v1/variants/$VARIANT_ID/versions \
+curl -X POST https://pass-builder.example/internal-api/wallet/builder/v1/variants/$VARIANT_ID/versions \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@student-id.pkpasstemplate"
 ```
@@ -45,7 +45,7 @@ If the archive has no `pass.json` entry at all, the call fails with
 ## Inspect the imported assets
 
 ```shell
-curl https://pass-builder.example/api/v1/versions/$VERSION_ID/assets/icon.png \
+curl https://pass-builder.example/internal-api/wallet/builder/v1/versions/$VERSION_ID/assets/icon.png \
   -H "Authorization: Bearer $TOKEN" \
   -o icon.png
 ```
@@ -60,7 +60,7 @@ corrected icon, for instance — replace it directly while the version is
 still a draft.
 
 ```shell
-curl -X PUT https://pass-builder.example/api/v1/versions/$VERSION_ID/assets/icon.png \
+curl -X PUT https://pass-builder.example/internal-api/wallet/builder/v1/versions/$VERSION_ID/assets/icon.png \
   -H "Authorization: Bearer $TOKEN" \
   -F "file=@icon-fixed.png"
 ```
@@ -74,7 +74,7 @@ publish-time validation is to catch every problem in that set at once — so
 there is no per-rule endpoint.
 
 ```shell
-curl -X PUT https://pass-builder.example/api/v1/versions/$VERSION_ID/mappings \
+curl -X PUT https://pass-builder.example/internal-api/wallet/builder/v1/versions/$VERSION_ID/mappings \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -101,7 +101,7 @@ that lets you check names before you use them.
 Run the full publish-time validation without committing to it.
 
 ```shell
-curl -X POST https://pass-builder.example/api/v1/versions/$VERSION_ID/validate \
+curl -X POST https://pass-builder.example/internal-api/wallet/builder/v1/versions/$VERSION_ID/validate \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -112,7 +112,7 @@ any field group, or a missing `icon.png`.
 ## Publish
 
 ```shell
-curl -X POST https://pass-builder.example/api/v1/versions/$VERSION_ID/publish \
+curl -X POST https://pass-builder.example/internal-api/wallet/builder/v1/versions/$VERSION_ID/publish \
   -H "Authorization: Bearer $TOKEN"
 ```
 

@@ -23,14 +23,17 @@ def settings_env(monkeypatch):
 
 
 def route_paths(app) -> set[str]:
-    """Every path the app routes, without the mount point.
+    """Every *schema-visible* path the app routes, without the mount point.
 
     FastAPI >=0.141 stores included routers as lazy proxy objects on
     ``app.routes`` (its "avoid flattening" performance refactors, released
     2026-07-27..29) instead of eagerly flattening them into plain routes with
     a ``.path`` attribute, so ``hasattr(route, "path")`` no longer finds the
     business and health routes. The OpenAPI schema is the stable, public
-    place to read the fully resolved, prefix-composed route table.
+    place to read the fully resolved, prefix-composed route table -- but it
+    only contains routes with ``include_in_schema=True``. A route hidden from
+    the schema would not show up here and would not be caught by
+    ``test_no_route_carries_the_old_hardcoded_prefix``.
     """
     return set(app.openapi()["paths"])
 
@@ -105,13 +108,20 @@ async def test_healthz_answers_both_bare_and_root_path_prefixed():
     assert prefixed_response.status_code == 200
 
 
-async def test_openapi_json_is_served_under_the_api_prefix():
-    """`openapi_url` moved under `API_PREFIX` in app.py; prove it is actually
-    served there rather than only appearing in `route_paths()`, which reads
-    the schema itself and so cannot check where the schema is exposed."""
+async def test_documentation_urls_are_served_under_the_api_prefix():
+    """`docs_url`, `openapi_url` and `redoc_url` all moved under `API_PREFIX`
+    in app.py; prove each is actually served there rather than only
+    appearing in `route_paths()`, which reads the schema itself and so
+    cannot check where the schema (or the two UIs built on top of it) are
+    exposed. One test covering all three keeps a left-behind `redoc_url`
+    (or any future documentation setting) from going unnoticed again."""
     app = create_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get(f"{API_PREFIX}/openapi.json")
+        openapi_response = await client.get(f"{API_PREFIX}/openapi.json")
+        docs_response = await client.get(f"{API_PREFIX}/docs")
+        redoc_response = await client.get(f"{API_PREFIX}/redoc")
 
-    assert response.status_code == 200
+    assert openapi_response.status_code == 200
+    assert docs_response.status_code == 200
+    assert redoc_response.status_code == 200

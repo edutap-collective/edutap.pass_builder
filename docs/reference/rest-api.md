@@ -1,7 +1,16 @@
 # REST API
 
-Every endpoint lives under the prefix `/api/v1`, except `/healthz` and
-`/readyz`.
+Every endpoint lives under the service path `/builder/v1`, except `/healthz`
+and `/readyz`, which sit outside it on purpose so a Docker healthcheck
+never needs to know any prefix at all.
+This document always shows that service path alone.
+The full, externally reachable URL additionally carries this deployment's
+mount point in front of it: `<mount point>/builder/v1/...`, e.g.
+`/internal-api/wallet/builder/v1/passes`.
+The mount point comes from `EDUTAP_PASS_BUILDER_API_CLASS` and
+`EDUTAP_PASS_BUILDER_API_DOMAIN` (`Settings.base_path`) and therefore varies
+per deployment — compose it yourself from those two settings rather than
+assuming the example above.
 Authentication is a bearer token identifying one `api_client`, which
 belongs to exactly one tenant.
 

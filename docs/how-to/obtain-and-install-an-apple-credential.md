@@ -14,7 +14,7 @@ The private key never leaves it: it is sealed immediately and no endpoint
 ever returns it, not even to the `credentials` scope.
 
 ```shell
-curl -X POST https://pass-builder.example/api/v1/credentials \
+curl -X POST https://pass-builder.example/internal-api/wallet/builder/v1/credentials \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -30,7 +30,7 @@ Note its `id` — every following call needs it.
 ## Fetch the CSR and have it signed
 
 ```shell
-curl https://pass-builder.example/api/v1/credentials/$CREDENTIAL_ID/csr \
+curl https://pass-builder.example/internal-api/wallet/builder/v1/credentials/$CREDENTIAL_ID/csr \
   -H "Authorization: Bearer $TOKEN" \
   -o credential.csr
 ```
@@ -50,7 +50,7 @@ this flow.
 ## Install the certificate
 
 ```shell
-curl -X PUT https://pass-builder.example/api/v1/credentials/$CREDENTIAL_ID/certificate \
+curl -X PUT https://pass-builder.example/internal-api/wallet/builder/v1/credentials/$CREDENTIAL_ID/certificate \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{\"certificate_pem\": $(python3 -c 'import json,sys; print(json.dumps(open("credential.pem").read()))')}"
@@ -74,14 +74,14 @@ Apple pass certificates expire yearly.
 Poll for credentials nearing expiry and renew ahead of time.
 
 ```shell
-curl "https://pass-builder.example/api/v1/credentials?provider=apple&expiring_within=30d" \
+curl "https://pass-builder.example/internal-api/wallet/builder/v1/credentials?provider=apple&expiring_within=30d" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
 For each one that needs renewing:
 
 ```shell
-curl -X POST https://pass-builder.example/api/v1/credentials/$CREDENTIAL_ID/renew \
+curl -X POST https://pass-builder.example/internal-api/wallet/builder/v1/credentials/$CREDENTIAL_ID/renew \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -96,7 +96,7 @@ Point your template variants at the successor's `id` (`PATCH
 ## Retire a credential
 
 ```shell
-curl -X DELETE https://pass-builder.example/api/v1/credentials/$CREDENTIAL_ID \
+curl -X DELETE https://pass-builder.example/internal-api/wallet/builder/v1/credentials/$CREDENTIAL_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -113,7 +113,7 @@ both PEM blocks in the body; the credential set is created `active` in one
 step.
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/credentials \
+curl -X POST http://localhost:8000/internal-api/wallet/builder/v1/credentials \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "$(jq -n \
