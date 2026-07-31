@@ -1,6 +1,6 @@
 """Tests for the audit log endpoint: tenant scoping and pagination.
 
-The audit table grows with every render, so `GET {API_PREFIX}/audit` must
+The audit table grows with every render, so `GET /builder/v1/audit` must
 never return an unbounded result set -- see `routers/audit.py::list_audit`'s
 `limit`/`offset` query params.
 """

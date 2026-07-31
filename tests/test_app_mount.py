@@ -5,6 +5,7 @@ required settings are set here because create_app() resolves get_settings().
 """
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 from edutap.pass_builder.app import API_PREFIX, create_app
 from edutap.pass_builder.settings import get_settings
@@ -77,3 +78,40 @@ def test_no_route_carries_the_old_hardcoded_prefix():
     assert not [
         path for path in route_paths(create_app()) if path.startswith("/api/v1")
     ]
+
+
+async def test_healthz_answers_both_bare_and_root_path_prefixed():
+    """`/healthz` must be reachable two ways from the same running process.
+
+    Starlette only strips `root_path` from the incoming path when the raw
+    path already carries it (`starlette._utils.get_route_path`); otherwise it
+    falls back to matching the raw path unchanged. That is exactly what lets
+    one process answer both the Docker healthcheck, which hits the container
+    directly at the bare path, and Traefik forwarding the full path without a
+    stripprefix middleware -- the two deployments `app.py`'s `root_path`
+    comment promises to support. `/healthz` has no dependencies (unlike
+    `/readyz`, which needs the database, object store and data provider), so
+    it needs no fixtures beyond the settings this module already sets.
+    """
+    app = create_app()
+    prefixed_path = f"{get_settings().base_path}/healthz"
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        bare_response = await client.get("/healthz")
+        prefixed_response = await client.get(prefixed_path)
+
+    assert bare_response.status_code == 200
+    assert prefixed_response.status_code == 200
+
+
+async def test_openapi_json_is_served_under_the_api_prefix():
+    """`openapi_url` moved under `API_PREFIX` in app.py; prove it is actually
+    served there rather than only appearing in `route_paths()`, which reads
+    the schema itself and so cannot check where the schema is exposed."""
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get(f"{API_PREFIX}/openapi.json")
+
+    assert response.status_code == 200
