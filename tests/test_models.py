@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.models.db import Template, TemplateVariant, Tenant
 from edutap.pass_builder.models.enums import WalletType
@@ -8,7 +8,7 @@ from edutap.pass_builder.models.enums import WalletType
 
 @pytest.fixture(autouse=True)
 async def schema(session):
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
 
 async def make_template(session) -> Template:

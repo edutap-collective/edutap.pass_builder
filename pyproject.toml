@@ -39,11 +39,25 @@ dev = [
 ]
 docs = ["myst-parser", "sphinx>=8"]
 
+# How `edutap.db_definitions` finds this package's tables. Several packages share
+# one database; the tool scans this entry point to check them against each other
+# for colliding names and for types left to `search_path`.
+#
+# It is a *development* dependency and never a runtime one -- `models/dbdef.py`
+# guards the import so a deployment without the tool imports cleanly.
+[project.entry-points."edutap.db_definitions"]
+schema = "edutap.pass_builder.models.dbdef:definition"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/edutap"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# So that `tests.dbschema` -- the shared helper that creates this package's
+# schema before its tables -- is importable from every test file, including the
+# ones under `tests/services/`, which is a package and therefore does not get its
+# own directory on `sys.path`.
+pythonpath = ["."]
 addopts = "-ra --strict-markers"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"

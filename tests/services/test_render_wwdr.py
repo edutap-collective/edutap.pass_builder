@@ -29,7 +29,7 @@ from pathlib import Path
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import pkcs7
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.auth import AuthContext
 from edutap.pass_builder.errors import ProblemError
@@ -89,7 +89,7 @@ class FakeObjectStore:
 
 @pytest.fixture(autouse=True)
 async def schema(session):
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
 
 @pytest.fixture

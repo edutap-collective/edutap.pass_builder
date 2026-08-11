@@ -21,7 +21,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.auth import AuthContext
 from edutap.pass_builder.clients.data_provider import DataProviderClient
@@ -103,7 +103,7 @@ async def e2e_env(session) -> AsyncIterator[E2eEnv]:
     `objectstore` (RustFS) service -- both must be reachable, hence this
     fixture only ever runs under `pytest.mark.integration`.
     """
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
     wwdr_path = _FIXTURES_DIR / "wwdr-g4.pem"
     # `RenderService._apple_signer` reads the WWDR certificate straight from

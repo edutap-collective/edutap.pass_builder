@@ -15,8 +15,9 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field
 
+from .base import Base
 from .enums import (
     CredentialStatus,
     Provider,
@@ -63,8 +64,20 @@ def _enum_type(enum_cls: type[Enum], name: str) -> SqlEnum:
     partial unique index ``WHERE status = 'published'`` would never match.
     One shared instance per enum class/name pair is reused across tables so
     the underlying Postgres ``CREATE TYPE`` only happens once per name.
+
+    ``inherit_schema=True`` puts the type in the schema of the table that uses
+    it. SQLAlchemy scopes a type to the *metadata*, not to that table, so
+    without it the ``CREATE TYPE`` lands wherever ``search_path`` resolves --
+    typically ``public``, the one schema reserved for the cross-package
+    contract. `edutap-dbdef` reports that as ``unqualified_type`` and refuses
+    to run rather than create the type in a namespace every package shares.
     """
-    return SqlEnum(enum_cls, values_callable=lambda e: [m.value for m in e], name=name)
+    return SqlEnum(
+        enum_cls,
+        values_callable=lambda e: [m.value for m in e],
+        name=name,
+        inherit_schema=True,
+    )
 
 
 def _enum_column(enum_type: SqlEnum, *, nullable: bool) -> Column:
@@ -76,7 +89,7 @@ _wallet_type = _enum_type(WalletType, "wallet_type")
 _value_type = _enum_type(ValueType, "value_type")
 
 
-class Tenant(SQLModel, table=True):
+class Tenant(Base, table=True):
     """An organisational unit owning templates and credentials."""
 
     __tablename__ = "tenant"
@@ -87,7 +100,7 @@ class Tenant(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 
-class ApiClient(SQLModel, table=True):
+class ApiClient(Base, table=True):
     """A machine credential authenticating requests for exactly one tenant."""
 
     __tablename__ = "api_client"
@@ -102,7 +115,7 @@ class ApiClient(SQLModel, table=True):
     last_used_at: datetime | None = Field(default=None, sa_column=_tz(nullable=True))
 
 
-class CredentialSet(SQLModel, table=True):
+class CredentialSet(Base, table=True):
     """A signing credential for one wallet provider, one renewal chain."""
 
     __tablename__ = "credential_set"
@@ -145,7 +158,7 @@ class CredentialSet(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 
-class SecretBlob(SQLModel, table=True):
+class SecretBlob(Base, table=True):
     """Encrypted secret material (private key or service account JSON)."""
 
     __tablename__ = "secret_blob"
@@ -162,7 +175,7 @@ class SecretBlob(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 
-class Template(SQLModel, table=True):
+class Template(Base, table=True):
     """A logical credential, for example a student identity card."""
 
     __tablename__ = "template"
@@ -177,7 +190,7 @@ class Template(SQLModel, table=True):
     archived_at: datetime | None = Field(default=None, sa_column=_tz(nullable=True))
 
 
-class TemplateVariant(SQLModel, table=True):
+class TemplateVariant(Base, table=True):
     """One design of a template for one wallet platform."""
 
     __tablename__ = "template_variant"
@@ -208,7 +221,7 @@ class TemplateVariant(SQLModel, table=True):
     archived_at: datetime | None = Field(default=None, sa_column=_tz(nullable=True))
 
 
-class TemplateVersion(SQLModel, table=True):
+class TemplateVersion(Base, table=True):
     """Everything that determines rendering: content, assets, mapping rules.
 
     A published version is immutable. The platform payload check below
@@ -258,7 +271,7 @@ class TemplateVersion(SQLModel, table=True):
     published_at: datetime | None = Field(default=None, sa_column=_tz(nullable=True))
 
 
-class TemplateAsset(SQLModel, table=True):
+class TemplateAsset(Base, table=True):
     """A static file (icon, logo, background, ...) of an immutable version."""
 
     __tablename__ = "template_asset"
@@ -274,7 +287,7 @@ class TemplateAsset(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 
-class MappingRule(SQLModel, table=True):
+class MappingRule(Base, table=True):
     """A binding from one data_provider field to one place in the pass."""
 
     __tablename__ = "mapping_rule"
@@ -296,7 +309,7 @@ class MappingRule(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 
-class DataField(SQLModel, table=True):
+class DataField(Base, table=True):
     """A cached entry from the data_provider field catalogue."""
 
     __tablename__ = "data_field"
@@ -311,7 +324,7 @@ class DataField(SQLModel, table=True):
     fetched_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 
-class AuditLog(SQLModel, table=True):
+class AuditLog(Base, table=True):
     """An immutable record of one rendering or management operation.
 
     ``ts`` is this row's creation timestamp (the spec names it ``ts``
