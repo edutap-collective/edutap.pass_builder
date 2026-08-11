@@ -1,6 +1,6 @@
 import pytest
-from sqlmodel import SQLModel
 from starlette.requests import Request
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.auth import (
     AuthContext,
@@ -15,7 +15,7 @@ from edutap.pass_builder.models.enums import Scope
 
 @pytest.fixture(autouse=True)
 async def schema(session):
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
 
 async def seed(session) -> str:

@@ -29,7 +29,7 @@ from contextlib import asynccontextmanager
 
 import pytest
 from sqlalchemy import select
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables, drop_schema_and_tables
 
 from edutap.pass_builder import database
 from edutap.pass_builder.auth import AuthContext
@@ -83,10 +83,10 @@ async def _schema(engine):
     share.
     """
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+        await conn.run_sync(create_schema_and_tables)
     yield
     async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.drop_all)
+        await conn.run_sync(drop_schema_and_tables)
 
 
 @pytest.fixture(autouse=True)

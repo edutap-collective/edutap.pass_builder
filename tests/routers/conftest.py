@@ -32,7 +32,7 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.app import create_app
 from edutap.pass_builder.auth import hash_token
@@ -60,7 +60,7 @@ os.environ.setdefault(
 @pytest.fixture(autouse=True)
 async def schema(session):
     """Create every table once per test, in the test's own transaction."""
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
 
 class FakeObjectStore:

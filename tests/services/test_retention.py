@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.clients.data_provider import CatalogueField
 from edutap.pass_builder.models.db import AuditLog, DataField, Tenant
@@ -18,7 +18,7 @@ from edutap.pass_builder.services.retention import (
 @pytest.fixture(autouse=True)
 async def schema(session):
     """Create every table once per test, in the test's own transaction."""
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
 
 @pytest.fixture

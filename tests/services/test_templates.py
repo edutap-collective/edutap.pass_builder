@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
 import pytest
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.engine.spec import RuleSpec
 from edutap.pass_builder.errors import ProblemError
@@ -28,7 +28,7 @@ from edutap.pass_builder.services.templates import TemplateService
 
 @pytest.fixture(autouse=True)
 async def schema(session):
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
 
 class FakeObjectStore:

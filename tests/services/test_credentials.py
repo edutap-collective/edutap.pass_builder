@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlmodel import SQLModel
+from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.errors import ProblemError
 from edutap.pass_builder.models.db import Tenant
@@ -19,7 +19,7 @@ CERT = Path(__file__).parent.parent / "fixtures" / "apple_cert.pem"
 
 @pytest.fixture(autouse=True)
 async def schema(session):
-    await session.run_sync(lambda s: SQLModel.metadata.create_all(s.get_bind()))
+    await session.run_sync(lambda s: create_schema_and_tables(s.get_bind()))
 
 
 def service(session) -> CredentialService:
