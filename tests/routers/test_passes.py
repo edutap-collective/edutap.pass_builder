@@ -209,3 +209,44 @@ async def test_update_pass_re_renders_same_serial(client, session, data_provider
     )
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/vnd.apple.pkpass"
+
+
+async def test_deactivate_apple_pass_is_501_not_500(client, session):
+    """ "Not built" and "we broke" are different answers to the caller.
+
+    A bare `NotImplementedError` has no handler in this application and would
+    arrive as a 500 -- which tells a caller to retry something that will never
+    succeed. The service raises a `ProblemError` instead, so the installed
+    handler renders a problem document with the right status.
+    """
+    renderer = await seed_client(session, [Scope.RENDER])
+    await _seed_published_apple_template(session, renderer.tenant_id)
+
+    response = await client.post(
+        f"{API_PREFIX}/passes/11111111-1111-1111-1111-111111111111/deactivate",
+        json={"template": "student-id", "wallet_type": "apple"},
+        headers=renderer.headers,
+    )
+
+    assert response.status_code == 501
+    assert response.headers["content-type"].startswith("application/problem+json")
+    assert response.json()["type"].endswith("wallet_type_not_supported")
+
+
+async def test_deactivate_pass_requires_render_scope(client, session):
+    """Withdrawing a pass needs `render`, like creating one.
+
+    `manage` is the strongest token this service issues and still must not do
+    it: the scopes separate what a thing IS allowed to do, not how privileged
+    its holder feels.
+    """
+    manager = await seed_client(session, [Scope.MANAGE])
+    await _seed_published_apple_template(session, manager.tenant_id)
+
+    response = await client.post(
+        f"{API_PREFIX}/passes/11111111-1111-1111-1111-111111111111/deactivate",
+        json={"template": "student-id", "wallet_type": "apple"},
+        headers=manager.headers,
+    )
+
+    assert response.status_code == 403

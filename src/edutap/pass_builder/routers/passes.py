@@ -6,6 +6,8 @@ from ..auth import AuthContext, require
 from ..dependencies import get_render_service
 from ..models.api import (
     CreatePassRequest,
+    DeactivatePassRequest,
+    DeactivatePassResponse,
     GooglePassResponse,
     PreviewRequest,
     PreviewResponse,
@@ -99,6 +101,36 @@ async def update_pass(
         media_type="application/json",
         status_code=200,
     )
+
+
+@router.post("/passes/{pass_id}/deactivate", response_model=DeactivatePassResponse)
+async def deactivate_pass(
+    pass_id: str,
+    body: DeactivatePassRequest,
+    request: Request,
+    auth: AuthContext = Depends(require(Scope.RENDER)),  # noqa: B008
+    render_service: RenderService = Depends(get_render_service),  # noqa: B008
+) -> DeactivatePassResponse:
+    """Withdraw an issued pass. Google only; Apple answers 501.
+
+    `POST` rather than `DELETE`, and the choice is not cosmetic: nothing is
+    deleted here. This service keeps no register of issued passes -- there is
+    no `pass` table -- so there is no row to remove. What happens is a state
+    change on an object that lives at Google, and a `DELETE` would promise a
+    removal that neither side performs.
+
+    Idempotent: withdrawing an already withdrawn pass answers 200 again.
+    """
+    object_id, state = await render_service.deactivate_pass(
+        auth,
+        pass_id=pass_id,
+        template_key=body.template,
+        wallet_type=body.wallet_type,
+        variant_key=body.variant,
+        version_number=body.template_version,
+        request_id=request.headers.get("x-request-id"),
+    )
+    return DeactivatePassResponse(pass_id=pass_id, object_id=object_id, state=state)
 
 
 @router.post("/passes/{pass_id}/save-link")

@@ -548,6 +548,162 @@ async def test_save_link_raises_not_implemented_for_apple(render_env):
         )
 
 
+# --- deactivate_pass -------------------------------------------------------------
+
+
+async def _audit_of(session, tenant_id) -> list[AuditLog]:
+    """Return this tenant's audit entries, oldest first."""
+    query = (
+        select(AuditLog)
+        .where(AuditLog.tenant_id == tenant_id)  # ty: ignore[invalid-argument-type]
+        .order_by(AuditLog.ts)  # ty: ignore[invalid-argument-type]
+    )
+    return list((await session.execute(query)).scalars().all())
+
+
+async def _google_env(session):
+    """A tenant with a published Google template and a service wired to a fake api."""
+    tenant, api_client = await _seed_tenant_and_client(session)
+    backend = _backend()
+    await _seed_published_google_template(session, tenant.id, backend)
+    google_api = FakeGoogleApi()
+    service = _make_service(
+        session,
+        FakeObjectStore(),
+        FakeDataProvider(),
+        google_api=google_api,
+        backend=backend,
+    )
+    auth = AuthContext(
+        client_id=api_client.id, tenant_id=tenant.id, scopes={Scope.RENDER}
+    )
+    return tenant, auth, service, google_api
+
+
+async def test_deactivate_pass_patches_the_object_state_to_expired(session):
+    """The withdrawal is a state change on the Google object, nothing more."""
+    _tenant, auth, service, google_api = await _google_env(session)
+
+    object_id, state = await service.deactivate_pass(
+        auth,
+        pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
+        template_key="staff-id",
+    )
+
+    assert (object_id, state) == ("3388.abc-uuid", "EXPIRED")
+    [(sent, credentials)] = google_api.updated
+    assert credentials is not None
+    assert sent["id"] == "3388.abc-uuid"
+    assert sent["state"] == "EXPIRED"
+
+
+async def test_deactivate_pass_sends_only_id_class_and_state(session):
+    """Nothing else may travel, because the update is a PATCH.
+
+    Whatever this object carries is written to the live object. A field added
+    here by accident -- a placeholder title, a stale class -- would overwrite
+    the real one, and the pass on the phone would change while the log said
+    "withdrawn".
+    """
+    _tenant, auth, service, google_api = await _google_env(session)
+
+    await service.deactivate_pass(
+        auth,
+        pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
+        template_key="staff-id",
+    )
+
+    [(sent, _credentials)] = google_api.updated
+    assert set(sent) == {"__model_name__", "id", "classId", "state"}
+
+
+async def test_deactivate_pass_is_idempotent(session):
+    """Withdrawing twice is not an error.
+
+    A withdrawal that failed the second time would teach callers to skip
+    retries, and a retry is exactly what a caller does when it did not see the
+    first answer.
+    """
+    _tenant, auth, service, google_api = await _google_env(session)
+
+    first = await service.deactivate_pass(
+        auth,
+        pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
+        template_key="staff-id",
+    )
+    second = await service.deactivate_pass(
+        auth,
+        pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
+        template_key="staff-id",
+    )
+
+    assert first == second
+    assert len(google_api.updated) == 2
+
+
+async def test_deactivate_pass_writes_a_success_audit(session):
+    """`pass_id` is recorded as `subject_ref`, and no field is requested."""
+    tenant, auth, service, _google_api = await _google_env(session)
+
+    await service.deactivate_pass(
+        auth,
+        pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
+        template_key="staff-id",
+    )
+
+    entry = (await _audit_of(session, tenant.id))[-1]
+    assert entry.action == "pass.deactivate"
+    assert entry.outcome == "success"
+    assert entry.error_code is None
+    assert entry.subject_ref == "abc-uuid"
+    assert entry.requested_fields == []
+
+
+async def test_deactivate_pass_refuses_apple_with_501(render_env):
+    """An Apple pass is withdrawn by delivering a voided version to the device.
+
+    This service does not deliver, so it says so. A 501 rather than the 500 a
+    bare `NotImplementedError` would produce here: "not built" and "we broke"
+    are different answers, and only one of them invites a retry.
+    """
+    env = render_env
+
+    with pytest.raises(ProblemError) as caught:
+        await env.service.deactivate_pass(
+            env.auth,
+            pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
+            template_key="student-id",
+            wallet_type=WalletType.APPLE,
+        )
+
+    assert caught.value.status == 501
+    assert caught.value.slug == "wallet_type_not_supported"
+
+
+async def test_a_refused_withdrawal_is_still_audited(render_env):
+    """The question asked later is "did anyone try to revoke this pass?".
+
+    `save_link` checks its wallet type before the audit block and therefore
+    leaves no trace of a refusal. Here the check sits inside it on purpose.
+    """
+    env = render_env
+    before = len(await env.list_audit())
+
+    with pytest.raises(ProblemError):
+        await env.service.deactivate_pass(
+            env.auth,
+            pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
+            template_key="student-id",
+            wallet_type=WalletType.APPLE,
+        )
+
+    entries = await env.list_audit()
+    assert len(entries) == before + 1
+    assert entries[-1].action == "pass.deactivate"
+    assert entries[-1].outcome == "error"
+    assert entries[-1].error_code == "wallet_type_not_supported"
+
+
 # --- preview ---------------------------------------------------------------------
 
 
