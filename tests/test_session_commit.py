@@ -150,7 +150,9 @@ async def test_rollback_discards_writes_when_the_block_raises():
             raise _Boom("simulated failure mid-request")
 
     async with _real_session() as session:
-        result = await session.execute(select(Tenant).where(Tenant.key == key))
+        result = await session.execute(
+            select(Tenant).where(Tenant.key == key)  # ty: ignore[invalid-argument-type]
+        )
         assert result.scalar_one_or_none() is None
 
 
@@ -220,14 +222,18 @@ async def test_durable_audit_survives_rollback_but_the_partial_write_does_not():
 
     async with _real_session() as session:
         client_result = await session.execute(
-            select(ApiClient).where(ApiClient.name == "partial-client")
+            select(ApiClient).where(
+                ApiClient.name == "partial-client"  # ty: ignore[invalid-argument-type]
+            )
         )
         assert client_result.scalar_one_or_none() is None, (
             "the failed operation's own partial write must not persist"
         )
 
         audit_result = await session.execute(
-            select(AuditLog).where(AuditLog.request_id == request_id)
+            select(AuditLog).where(
+                AuditLog.request_id == request_id  # ty: ignore[invalid-argument-type]
+            )
         )
         entry = audit_result.scalar_one_or_none()
         assert entry is not None, "the error audit entry must survive the rollback"
