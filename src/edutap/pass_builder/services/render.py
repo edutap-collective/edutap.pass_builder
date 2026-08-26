@@ -49,6 +49,14 @@ _SAMPLE_PLACEHOLDERS: dict[ValueType, str | bytes] = {
 
 _GOOGLE_OBJECT_MODEL = "GenericObject"
 
+#: What a withdrawn Google Wallet object is set to.
+#:
+#: `EXPIRED` rather than `INACTIVE` or `COMPLETED`: the Wallet app renders all
+#: three the same way -- greyed out and out of the pass list -- and of the three
+#: only `EXPIRED` says why. The distinction is ours to make and nobody else's,
+#: so it should be the one that reads correctly in an audit entry a year later.
+_GOOGLE_STATE_WITHDRAWN = "EXPIRED"
+
 
 class RenderResult(BaseModel):
     """The outcome of rendering one pass."""
@@ -302,6 +310,152 @@ class RenderService:
             requested_fields=[],
         )
         return link
+
+    async def deactivate_pass(
+        self,
+        auth: AuthContext,
+        *,
+        pass_id: str,
+        template_key: str,
+        wallet_type: WalletType = WalletType.GOOGLE,
+        variant_key: str | None = None,
+        version_number: int | None = None,
+        request_id: str | None = None,
+    ) -> tuple[str, str]:
+        """Withdraw an issued pass. Returns `(object_id, state)`.
+
+        GOOGLE ONLY, and the restriction is one of reach rather than of taste.
+        Withdrawing a Google pass is a state change on an object this service
+        owns and can reach: `state -> EXPIRED`, sent as a PATCH. An Apple pass
+        is withdrawn by putting `voided` on it and getting the DEVICE to fetch
+        the new version -- and the fetching is done by the VAS web service,
+        which this one neither owns nor can reach. Rendering voided bytes here
+        and handing them back would look like a withdrawal while the pass on
+        the phone stayed valid, so the request is refused with a 501 instead.
+
+        No `person_uid` and no re-rendering: the object id follows from the
+        issuer id and `pass_id`, and nothing but the state is touched. The
+        PATCH body is `{id, classId, state}` -- verified against
+        `_prepare_update`, which drops the model defaults that are not set,
+        `genericType` among them. A full replacement would have to carry the
+        whole object, and every field it failed to carry would be erased.
+
+        Idempotent by nature: setting EXPIRED on an already expired object
+        changes nothing and still answers 200. A withdrawal that fails the
+        second time would invite callers to skip retries.
+
+        Writes a `pass.deactivate` audit entry on success and on failure, the
+        same as `save_link` and `_render`. `pass_id` is recorded as
+        `subject_ref`, never a field value.
+        """
+        start = time.monotonic()
+        request_id = request_id or str(uuid4())
+        template_id: UUID | None = None
+        variant_id: UUID | None = None
+        version_id: UUID | None = None
+        try:
+            if wallet_type != WalletType.GOOGLE:
+                # INSIDE the `try`, unlike the same check in `save_link`, and
+                # deliberately: a refused withdrawal is exactly what somebody
+                # asks about later ("did anyone try to revoke this pass?").
+                # Raised as a `ProblemError` rather than `NotImplementedError`
+                # so it travels through the installed handler and reaches the
+                # caller as a 501 problem document. A bare
+                # `NotImplementedError` has no handler here and would arrive as
+                # a 500 -- "our fault, try again" -- for something that is
+                # neither our fault nor worth retrying.
+                raise ProblemError(
+                    501,
+                    "wallet_type_not_supported",
+                    "Withdrawing is only implemented for Google Wallet passes",
+                    "An Apple pass is withdrawn by delivering a voided version "
+                    "to the device, which this service does not do.",
+                )
+            _template, variant, _version = await self._resolve(
+                auth.tenant_id, template_key, wallet_type, variant_key, version_number
+            )
+            template_id, variant_id, version_id = (
+                _template.id,
+                variant.id,
+                _version.id,
+            )
+            credential_set = await self._load_credential_set(
+                auth.tenant_id, variant.credential_set_id
+            )
+            if credential_set is None or credential_set.issuer_id is None:
+                raise ProblemError(
+                    409,
+                    "google_credentials_missing",
+                    "No Google credential set configured for this variant",
+                )
+            if variant.google_class_id is None:
+                raise ProblemError(
+                    409,
+                    "google_class_not_configured",
+                    "Variant has no Google class id configured",
+                )
+            credentials = await self._open_google_credentials(credential_set)
+            object_id = google_object_id(credential_set.issuer_id, pass_id)
+            obj = self._google_api.new(
+                _GOOGLE_OBJECT_MODEL,
+                {
+                    "id": object_id,
+                    "classId": variant.google_class_id,
+                    "state": _GOOGLE_STATE_WITHDRAWN,
+                },
+            )
+            await self._google_api.aupdate(obj, credentials=credentials)
+        except ProblemError as exc:
+            await self._write_error_audit(
+                auth=auth,
+                request_id=request_id,
+                action="pass.deactivate",
+                error_code=exc.slug,
+                start=start,
+                template_id=template_id,
+                variant_id=variant_id,
+                version_id=version_id,
+                wallet_type=wallet_type,
+                person_uid=pass_id,
+                fields=[],
+            )
+            raise
+        except Exception as exc:
+            # Mirrors `_render` and `save_link`: any unexpected error still
+            # leaves an audit trail, with only a generic slug -- never the
+            # original message, which could carry secret material.
+            await self._write_error_audit(
+                auth=auth,
+                request_id=request_id,
+                action="pass.deactivate",
+                error_code="internal_error",
+                start=start,
+                template_id=template_id,
+                variant_id=variant_id,
+                version_id=version_id,
+                wallet_type=wallet_type,
+                person_uid=pass_id,
+                fields=[],
+            )
+            raise ProblemError(500, "internal_error", "Internal error") from exc
+
+        await write_audit(
+            self._session,
+            tenant_id=auth.tenant_id,
+            request_id=request_id,
+            actor_client_id=auth.client_id,
+            action="pass.deactivate",
+            outcome="success",
+            error_code=None,
+            duration_ms=_elapsed_ms(start),
+            template_id=template_id,
+            variant_id=variant_id,
+            version_id=version_id,
+            wallet_type=wallet_type,
+            subject_ref=pass_id,
+            requested_fields=[],
+        )
+        return object_id, _GOOGLE_STATE_WITHDRAWN
 
     async def preview(
         self,
