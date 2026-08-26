@@ -18,16 +18,28 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # uv reads this, so no step needs a version-specific flag.
+      UV_PYTHON: "3.14"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
-      - name: Install Python
-        run: uv python install 3.14
-
-      - name: Install the package with dev and docs extras
-        run: uv pip install --system -e ".[dev,docs]"
+      # ONE environment, managed by uv. The previous version used three: it
+      # installed an interpreter, then wrote the package into the runner's
+      # SYSTEM Python with `--system` -- which Ubuntu marks as externally
+      # managed (PEP 668), so the job died right there -- and then `uv run`
+      # would have used a third. The failure was not in any test; it happened
+      # before the first one was collected, which is why every run since
+      # 2026-08-07 was red without naming a cause.
+      #
+      # `uv sync` honours uv.lock, so the CI resolves what a developer
+      # resolved rather than whatever is newest that morning.
+      - name: Install the project with its dev and docs extras
+        run: uv sync --extra dev --extra docs
 
       - name: Ruff check
         run: uv run ruff check src tests
