@@ -86,4 +86,9 @@ convention = "pep257"
 "tests/*" = ["D", "S101"]
 
 [tool.ty.environment]
-root = ["./src", "./tests"]
+# The repository root, not "./tests": the suite imports its helper as
+# `tests.dbschema`, so what has to be importable is the package `tests`, which
+# lives at the root. With "./tests" on the path a module inside it resolves as
+# `dbschema` instead, and every `from tests.dbschema import ...` was reported as
+# an unresolved import -- ten of the twelve diagnostics this check produced.
+root = ["./src", "."]
