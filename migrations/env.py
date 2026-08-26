@@ -157,6 +157,9 @@ def do_run_migrations(connection: Connection) -> None:
         # autogenerate compares only the default schema and proposes creating
         # every table again. Bounded by `include_name`, see dbdef.py.
         include_schemas=True,
+        # ty: ignore[invalid-argument-type] -- alembic's own stub types
+        # `include_name` more narrowly than the runtime accepts; the callable
+        # this passes is the shape the documentation asks for.
         include_name=include_name_for(connection.dialect.default_schema_name),
     )
 

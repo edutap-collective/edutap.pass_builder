@@ -17,6 +17,10 @@ from collections.abc import Callable
 from typing import Any
 
 try:
+    # ty: ignore[unresolved-import] -- absent on purpose. The tool is a
+    # development helper, not a runtime dependency, and the `except` below is
+    # the whole point of this block; see the module docstring. A type checker
+    # reporting it as missing is reporting the design.
     from edutap.db_definitions import SchemaDefinition
 except ModuleNotFoundError:  # pragma: no cover - the service does not need the tool
     SchemaDefinition = None  # type: ignore[assignment]
