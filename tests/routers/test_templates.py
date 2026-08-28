@@ -46,7 +46,7 @@ async def _create_template_and_variant(client, headers) -> tuple[str, str]:
             json={
                 "key": "student",
                 "name": "Student",
-                "wallet_type": "apple",
+                "wallet_type": "APPLE_VAS",
                 "is_default": True,
             },
             headers=headers,
@@ -182,7 +182,7 @@ async def test_setting_default_unsets_previous_default(client, session):
             json={
                 "key": "staff",
                 "name": "Staff",
-                "wallet_type": "apple",
+                "wallet_type": "APPLE_VAS",
                 "is_default": True,
             },
             headers=manager.headers,
@@ -515,7 +515,7 @@ async def _seed_google_variant(
     await session.flush()
     variant = TemplateVariant(
         template_id=template.id,
-        wallet_type=WalletType.GOOGLE,
+        wallet_type=WalletType.GOOGLE_ST,
         key="staff",
         name="Staff",
         is_default=True,

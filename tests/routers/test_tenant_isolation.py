@@ -30,7 +30,7 @@ async def _owner_setup(client, session):
             json={
                 "key": "student",
                 "name": "Student",
-                "wallet_type": "apple",
+                "wallet_type": "APPLE_VAS",
                 "is_default": True,
             },
             headers=owner.headers,
@@ -154,7 +154,7 @@ async def test_other_tenant_cannot_render_foreign_template(client, session):
         json={
             "pass_id": "1",
             "template": "student-id",
-            "wallet_type": "apple",
+            "wallet_type": "APPLE_VAS",
             "person_uid": "u1",
         },
         headers=other.headers,

@@ -84,7 +84,7 @@ async def test_apple_pass_is_built_signed_and_verifies(e2e_env):
     """Import credential + publish template + render => a validly signed pass."""
     result = await e2e_env.create_apple_pass(person_uid="u1")
 
-    assert result.wallet_type == WalletType.APPLE
+    assert result.wallet_type == WalletType.APPLE_VAS
     assert result.pkpass is not None
     assert result.credential_set == "e2e-apple"
 

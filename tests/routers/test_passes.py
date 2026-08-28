@@ -69,7 +69,7 @@ async def _seed_published_apple_template(session, tenant_id) -> None:
 
     variant = TemplateVariant(
         template_id=template.id,
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         key="student",
         name="Student",
         is_default=True,
@@ -123,7 +123,7 @@ async def test_create_apple_pass_returns_pkpass_bytes_with_headers(
         json={
             "pass_id": "11111111-1111-1111-1111-111111111111",
             "template": "student-id",
-            "wallet_type": "apple",
+            "wallet_type": "APPLE_VAS",
             "person_uid": "u1",
         },
         headers=renderer.headers,
@@ -145,7 +145,7 @@ async def test_create_pass_requires_render_scope(client, session):
         json={
             "pass_id": "1",
             "template": "student-id",
-            "wallet_type": "apple",
+            "wallet_type": "APPLE_VAS",
             "person_uid": "u1",
         },
         headers=manager.headers,
@@ -163,7 +163,7 @@ async def test_create_pass_missing_field_is_422(client, session, data_provider):
         json={
             "pass_id": "1",
             "template": "student-id",
-            "wallet_type": "apple",
+            "wallet_type": "APPLE_VAS",
             "person_uid": "u1",
         },
         headers=renderer.headers,
@@ -180,7 +180,7 @@ async def test_preview_never_calls_data_provider(client, session, data_provider)
         f"{API_PREFIX}/passes/preview",
         json={
             "template": "student-id",
-            "wallet_type": "apple",
+            "wallet_type": "APPLE_VAS",
             "sample_data": {"person.name": "Grace Hopper"},
         },
         headers=renderer.headers,
@@ -202,7 +202,7 @@ async def test_update_pass_re_renders_same_serial(client, session, data_provider
         f"{API_PREFIX}/passes/11111111-1111-1111-1111-111111111111",
         json={
             "template": "student-id",
-            "wallet_type": "apple",
+            "wallet_type": "APPLE_VAS",
             "person_uid": "u1",
         },
         headers=renderer.headers,
@@ -224,7 +224,7 @@ async def test_deactivate_apple_pass_is_501_not_500(client, session):
 
     response = await client.post(
         f"{API_PREFIX}/passes/11111111-1111-1111-1111-111111111111/deactivate",
-        json={"template": "student-id", "wallet_type": "apple"},
+        json={"template": "student-id", "wallet_type": "APPLE_VAS"},
         headers=renderer.headers,
     )
 
@@ -245,7 +245,7 @@ async def test_deactivate_pass_requires_render_scope(client, session):
 
     response = await client.post(
         f"{API_PREFIX}/passes/11111111-1111-1111-1111-111111111111/deactivate",
-        json={"template": "student-id", "wallet_type": "apple"},
+        json={"template": "student-id", "wallet_type": "APPLE_VAS"},
         headers=manager.headers,
     )
 

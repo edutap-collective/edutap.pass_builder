@@ -120,7 +120,7 @@ async def apple_env(session):
 
     variant = TemplateVariant(
         template_id=template.id,
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         key="student",
         name="Student",
         is_default=True,
@@ -211,7 +211,7 @@ async def _create_pass(session, apple_env, *, wwdr_certificate_path: Path):
         auth,
         pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
         template_key="student-id",
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         variant_key=None,
         person_uid="u1",
         version_number=None,

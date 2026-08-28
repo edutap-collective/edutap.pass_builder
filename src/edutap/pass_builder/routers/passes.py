@@ -14,7 +14,7 @@ from ..models.api import (
     SaveLinkRequest,
     UpdatePassRequest,
 )
-from ..models.enums import Scope, WalletType
+from ..models.enums import APPLE_WALLET_TYPES, Scope
 from ..services.render import RenderResult, RenderService
 
 router = APIRouter(tags=["passes"])
@@ -66,7 +66,7 @@ async def create_pass(
         version_number=body.template_version,
         request_id=request.headers.get("x-request-id"),
     )
-    if result.wallet_type == WalletType.APPLE:
+    if result.wallet_type in APPLE_WALLET_TYPES:
         return _apple_response(result)
     return Response(
         content=_google_response(result, body.pass_id).model_dump_json(),
@@ -94,7 +94,7 @@ async def update_pass(
         version_number=body.template_version,
         request_id=request.headers.get("x-request-id"),
     )
-    if result.wallet_type == WalletType.APPLE:
+    if result.wallet_type in APPLE_WALLET_TYPES:
         return _apple_response(result)
     return Response(
         content=_google_response(result, pass_id).model_dump_json(),
