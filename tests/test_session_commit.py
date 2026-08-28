@@ -29,6 +29,7 @@ from contextlib import asynccontextmanager
 
 import pytest
 from sqlalchemy import select
+from sqlmodel import col
 from tests.dbschema import create_schema_and_tables, drop_schema_and_tables
 
 from edutap.pass_builder import database
@@ -130,12 +131,7 @@ async def test_commit_persists_across_separate_get_session_calls():
         session.add(Tenant(key=key, name="Commit Tenant"))
 
     async with _real_session() as session:
-        result = await session.execute(
-            select(Tenant).where(
-                Tenant.key  # ty: ignore[invalid-argument-type]
-                == key
-            )
-        )
+        result = await session.execute(select(Tenant).where(col(Tenant.key) == key))
         assert result.scalar_one_or_none() is not None
 
 
@@ -150,7 +146,7 @@ async def test_rollback_discards_writes_when_the_block_raises():
             raise _Boom("simulated failure mid-request")
 
     async with _real_session() as session:
-        result = await session.execute(select(Tenant).where(Tenant.key == key))
+        result = await session.execute(select(Tenant).where(col(Tenant.key) == key))
         assert result.scalar_one_or_none() is None
 
 
@@ -220,14 +216,14 @@ async def test_durable_audit_survives_rollback_but_the_partial_write_does_not():
 
     async with _real_session() as session:
         client_result = await session.execute(
-            select(ApiClient).where(ApiClient.name == "partial-client")
+            select(ApiClient).where(col(ApiClient.name) == "partial-client")
         )
         assert client_result.scalar_one_or_none() is None, (
             "the failed operation's own partial write must not persist"
         )
 
         audit_result = await session.execute(
-            select(AuditLog).where(AuditLog.request_id == request_id)
+            select(AuditLog).where(col(AuditLog.request_id) == request_id)
         )
         entry = audit_result.scalar_one_or_none()
         assert entry is not None, "the error audit entry must survive the rollback"
@@ -291,10 +287,7 @@ async def test_render_service_error_audit_survives_the_real_rollback():
 
     async with _real_session() as session:
         result = await session.execute(
-            select(AuditLog).where(
-                AuditLog.request_id  # ty: ignore[invalid-argument-type]
-                == request_id
-            )
+            select(AuditLog).where(col(AuditLog.request_id) == request_id)
         )
         entry = result.scalar_one_or_none()
         assert entry is not None
