@@ -28,6 +28,6 @@ def test_credential_response_exposes_metadata():
 
 def test_create_pass_request_requires_pass_id_and_person_uid():
     """CreatePassRequest rejects a payload missing required identifiers."""
-    incomplete_payload = {"template": "student-id", "wallet_type": "apple"}
+    incomplete_payload = {"template": "student-id", "wallet_type": "APPLE_VAS"}
     with pytest.raises(ValidationError):
         CreatePassRequest(**incomplete_payload)

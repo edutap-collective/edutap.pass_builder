@@ -67,7 +67,7 @@ class SeededVariant:
 
 async def seed_variant(
     session,
-    wallet_type: WalletType = WalletType.APPLE,
+    wallet_type: WalletType = WalletType.APPLE_VAS,
     *,
     key: str = "student",
     is_default: bool = True,
@@ -248,7 +248,7 @@ async def test_set_mappings_on_published_version_is_409(session, objectstore):
 
 
 async def test_publish_rejects_apple_variant_with_google_payload(session, objectstore):
-    seeded = await seed_variant(session, wallet_type=WalletType.APPLE)
+    seeded = await seed_variant(session, wallet_type=WalletType.APPLE_VAS)
     version = TemplateVersion(
         variant_id=seeded.variant_id,
         number=1,
@@ -269,7 +269,7 @@ async def test_publish_rejects_apple_variant_with_google_payload(session, object
 
 
 async def test_publish_rejects_missing_icon(session, objectstore):
-    seeded = await seed_variant(session, wallet_type=WalletType.APPLE)
+    seeded = await seed_variant(session, wallet_type=WalletType.APPLE_VAS)
     version = await a_draft_apple_version(session, seeded)
     svc = TemplateService(session, objectstore)
 
@@ -313,7 +313,7 @@ async def test_publish_requires_nfc_capable_credential_set(session, objectstore)
     await session.flush()
     variant = TemplateVariant(
         template_id=template.id,
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         key="student",
         name="Student",
         is_default=True,
@@ -344,7 +344,7 @@ async def test_publish_requires_nfc_capable_credential_set(session, objectstore)
 
 
 async def test_publish_rejects_mapping_target_missing_from_pass(session, objectstore):
-    seeded = await seed_variant(session, wallet_type=WalletType.APPLE)
+    seeded = await seed_variant(session, wallet_type=WalletType.APPLE_VAS)
     version = TemplateVersion(
         variant_id=seeded.variant_id,
         number=1,
@@ -382,7 +382,7 @@ async def test_publish_rejects_mapping_target_missing_from_pass(session, objects
 
 
 async def test_publish_accepts_mapping_target_present_in_pass(session, objectstore):
-    seeded = await seed_variant(session, wallet_type=WalletType.APPLE)
+    seeded = await seed_variant(session, wallet_type=WalletType.APPLE_VAS)
     version = TemplateVersion(
         variant_id=seeded.variant_id,
         number=1,
@@ -407,7 +407,7 @@ async def test_publish_accepts_mapping_target_present_in_pass(session, objectsto
 
 
 async def test_publish_derives_google_rules_from_placeholders(session, objectstore):
-    seeded = await seed_variant(session, wallet_type=WalletType.GOOGLE)
+    seeded = await seed_variant(session, wallet_type=WalletType.GOOGLE_ST)
     version = TemplateVersion(
         variant_id=seeded.variant_id,
         number=1,
@@ -458,12 +458,12 @@ async def test_build_render_spec_resolves_default_variant_and_published_version(
     spec = await svc.build_render_spec(
         tenant_variant.tenant_id,
         "student-id",
-        WalletType.APPLE,
+        WalletType.APPLE_VAS,
         variant_key=None,
         version_number=None,
     )
 
-    assert spec.wallet_type == WalletType.APPLE
+    assert spec.wallet_type == WalletType.APPLE_VAS
     assert spec.pass_json["formatVersion"] == 1  # ty: ignore[not-subscriptable]
     assert spec.assets["icon.png"] == b"\x89PNG"
 
@@ -476,7 +476,7 @@ async def test_build_render_spec_unknown_template_is_404(
         await svc.build_render_spec(
             tenant_variant.tenant_id,
             "no-such-template",
-            WalletType.APPLE,
+            WalletType.APPLE_VAS,
             variant_key=None,
             version_number=None,
         )
@@ -496,7 +496,7 @@ async def test_build_render_spec_no_published_version_is_404(
         await svc.build_render_spec(
             tenant_variant.tenant_id,
             "student-id",
-            WalletType.APPLE,
+            WalletType.APPLE_VAS,
             variant_key=None,
             version_number=None,
         )
@@ -537,7 +537,7 @@ async def test_create_variant_rejects_another_tenants_credential_set(
             template.id,
             key="student",
             name="Student",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             is_default=True,
             credential_set_id=foreign_credential.id,
             google_class_id=None,

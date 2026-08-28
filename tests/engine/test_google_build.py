@@ -12,7 +12,7 @@ def test_object_id_is_issuer_dot_uuid():
 
 def test_object_carries_id_class_and_resolved_values():
     spec = RenderSpec(
-        wallet_type=WalletType.GOOGLE,
+        wallet_type=WalletType.GOOGLE_ST,
         object_json={"cardTitle": {"defaultValue": {"value": "${person.name}"}}},
     )
     bound = [

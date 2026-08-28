@@ -7,7 +7,11 @@ name = "edutap.pass_builder"
 version = "0.1.0"
 description = "Stateless service building Apple and Google wallet passes from versioned templates"
 readme = "README.md"
-requires-python = ">=3.12"
+# 3.13, nicht 3.12: `edutap.data_models` verlangt es, und dieses Repo fuhr die
+# Untergrenze ohnehin nur als Absicht -- es gibt keine Testmatrix, und das Image ist
+# python:3.14-slim. 3.12 bleibt bis 2028 unterstuetzt, wird hier aber von nichts
+# gebraucht.
+requires-python = ">=3.13"
 classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -20,6 +24,10 @@ dependencies = [
     "alembic>=1.13",
     "asyncpg>=0.29",
     "cryptography>=43",
+    # The shared vocabulary. `WalletType` lives there, not here: a copy of a shared
+    # enum is a second truth, and the copy that stood in `models/enums.py` was on the
+    # coarse provider axis -- it could not express VAS versus Access at all.
+    "edutap.data_models>=0.3,<0.4",
     "edutap.wallet-apple>=1.0.0a2",
     "edutap.wallet-google>=3.0.0b1",
     "fastapi>=0.115",

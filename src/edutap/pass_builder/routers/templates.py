@@ -27,7 +27,7 @@ from ..models.api import (
     VersionResponse,
 )
 from ..models.db import Template, TemplateAsset, TemplateVariant, TemplateVersion
-from ..models.enums import Scope, WalletType
+from ..models.enums import GOOGLE_WALLET_TYPES, Scope
 from ..services.audit import elapsed_ms, write_audit
 from ..services.credentials import CredentialService
 from ..services.templates import TemplateService
@@ -257,7 +257,7 @@ async def sync_variant(
     """
     start = time.monotonic()
     variant = await templates.get_variant(auth.tenant_id, variant_id)
-    if variant.wallet_type != WalletType.GOOGLE:
+    if variant.wallet_type not in GOOGLE_WALLET_TYPES:
         raise ProblemError(
             400,
             "not_a_google_variant",

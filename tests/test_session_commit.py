@@ -281,7 +281,7 @@ async def test_render_service_error_audit_survives_the_real_rollback():
                 auth,
                 pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
                 template_key="no-such-template",
-                wallet_type=WalletType.APPLE,
+                wallet_type=WalletType.APPLE_VAS,
                 variant_key=None,
                 person_uid="u1",
                 version_number=None,
