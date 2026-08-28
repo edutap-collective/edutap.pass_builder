@@ -29,7 +29,14 @@ from ..engine.google_build import build_google_object, google_object_id
 from ..engine.spec import BoundValue, RenderSpec, RuleSpec
 from ..errors import ProblemError
 from ..models.db import CredentialSet, Template, TemplateVariant, TemplateVersion
-from ..models.enums import ValueType, VersionStatus, WalletType
+from ..models.enums import (
+    APPLE_WALLET_TYPES,
+    GOOGLE_WALLET_TYPES,
+    SUPPORTED_WALLET_TYPES,
+    ValueType,
+    VersionStatus,
+    WalletType,
+)
 from ..settings import Settings
 from .audit import write_audit, write_audit_durable
 from .credentials import CredentialService
@@ -103,6 +110,24 @@ def _elapsed_ms(start: float) -> int:
 def _placeholder_for(rule: RuleSpec) -> str | bytes:
     """Return a generated placeholder value for a rule with no sample data."""
     return _SAMPLE_PLACEHOLDERS.get(rule.value_type, f"<{rule.source_field}>")
+
+
+def _require_supported(wallet_type: WalletType) -> None:
+    """Refuse a wallet type this service does not implement.
+
+    The single gate: every build goes through `_render`, and `save_link` and
+    `deactivate_pass` carry their own, narrower checks for the same reason.
+    """
+    if wallet_type not in SUPPORTED_WALLET_TYPES:
+        supported = ", ".join(sorted(w.value for w in SUPPORTED_WALLET_TYPES))
+        raise ProblemError(
+            501,
+            "wallet_type_not_supported",
+            f"This service does not build {wallet_type.value} passes",
+            f"Supported wallet types are: {supported}. Access and Identity "
+            "credentials require secure element provisioning, which this service "
+            "does not do; they are built elsewhere.",
+        )
 
 
 class RenderService:
@@ -207,7 +232,7 @@ class RenderService:
         *,
         pass_id: str,
         template_key: str,
-        wallet_type: WalletType = WalletType.GOOGLE,
+        wallet_type: WalletType = WalletType.GOOGLE_ST,
         variant_key: str | None = None,
         version_number: int | None = None,
         request_id: str | None = None,
@@ -215,14 +240,18 @@ class RenderService:
         """Return a Google "save to wallet" link for an already-pushed object.
 
         Apple passes have no equivalent web link in this design -- they are
-        distributed as a signed `.pkpass` file -- so only
-        `WalletType.GOOGLE` is supported here. Writes a `pass.save_link`
-        audit entry on both success and failure, mirroring `_render` --
-        `pass_id` is recorded as `subject_ref`, never a field value.
+        distributed as a signed `.pkpass` file -- so only Google wallet types
+        are supported here. Writes a `pass.save_link` audit entry on both
+        success and failure, mirroring `_render` -- `pass_id` is recorded as
+        `subject_ref`, never a field value.
         """
-        if wallet_type != WalletType.GOOGLE:
-            raise NotImplementedError(
-                "save_link is only implemented for WalletType.GOOGLE"
+        if wallet_type not in GOOGLE_WALLET_TYPES:
+            raise ProblemError(
+                501,
+                "wallet_type_not_supported",
+                "Save links are only implemented for Google Wallet passes",
+                "An Apple pass is distributed as a signed .pkpass file and has "
+                "no equivalent web link in this design.",
             )
         start = time.monotonic()
         request_id = request_id or str(uuid4())
@@ -317,7 +346,7 @@ class RenderService:
         *,
         pass_id: str,
         template_key: str,
-        wallet_type: WalletType = WalletType.GOOGLE,
+        wallet_type: WalletType = WalletType.GOOGLE_ST,
         variant_key: str | None = None,
         version_number: int | None = None,
         request_id: str | None = None,
@@ -354,7 +383,7 @@ class RenderService:
         variant_id: UUID | None = None
         version_id: UUID | None = None
         try:
-            if wallet_type != WalletType.GOOGLE:
+            if wallet_type not in GOOGLE_WALLET_TYPES:
                 # INSIDE the `try`, unlike the same check in `save_link`, and
                 # deliberately: a refused withdrawal is exactly what somebody
                 # asks about later ("did anyone try to revoke this pass?").
@@ -483,7 +512,7 @@ class RenderService:
         bound = bind(spec.rules, data)
         bound_fields = [item.rule.source_field for item in bound]
 
-        if spec.wallet_type == WalletType.APPLE:
+        if spec.wallet_type in APPLE_WALLET_TYPES:
             # Deep, not shallow: `_set_field`/`_set_pointer` mutate nested
             # dicts (a field entry, a JSON-pointer target's parent) in
             # place, not just the top-level dict `dict(...)` would copy --
@@ -494,7 +523,7 @@ class RenderService:
                 copy.deepcopy(spec.pass_json or {}), dict(spec.assets), bound
             )
             return {"pass_json": resolved, "bound_fields": bound_fields}
-        if spec.wallet_type == WalletType.GOOGLE:
+        if spec.wallet_type in GOOGLE_WALLET_TYPES:
             # `apply_google` (via `resolve_placeholders`) already returns a
             # brand new structure rather than mutating its input -- unlike
             # `apply_apple`, it needs no defensive copy here.
@@ -519,6 +548,17 @@ class RenderService:
         is_update: bool,
     ) -> RenderResult:
         """Shared body of `create_pass`/`update_pass`: resolve, bind, build, audit."""
+        # BEFORE ANYTHING ELSE, and before the audit entry exists: a wallet type this
+        # service cannot build is not a failed render, it is a request that was never
+        # going to happen. Recording it as an attempt would put a row in the audit log
+        # for work nobody did.
+        #
+        # 501 rather than 400: the request is well formed and the wallet type is real
+        # -- Access and Identity are credential technologies involving secure element
+        # provisioning, which this service does not do at all. A 400 would tell the
+        # caller to fix something that is not wrong, and a 500 would claim it was our
+        # fault and worth retrying.
+        _require_supported(wallet_type)
         start = time.monotonic()
         request_id = request_id or str(uuid4())
         fields: list[str] = []
@@ -663,7 +703,7 @@ class RenderService:
         is_update: bool,
     ) -> RenderResult:
         """Build the platform payload and deliver it (sign, or push to Google)."""
-        if spec.wallet_type == WalletType.APPLE:
+        if spec.wallet_type in APPLE_WALLET_TYPES:
             sign = await self._apple_signer(tenant_id, variant.credential_set_id)
             try:
                 pkpass = build_apple(spec, bound, serial_number=pass_id, sign=sign)
@@ -680,14 +720,14 @@ class RenderService:
                 tenant_id, variant.credential_set_id
             )
             return RenderResult(
-                wallet_type=WalletType.APPLE,
+                wallet_type=WalletType.APPLE_VAS,
                 pkpass=pkpass,
                 template_version=version.number,
                 variant=variant.key,
                 credential_set=credential_set.label if credential_set else None,
             )
 
-        if spec.wallet_type == WalletType.GOOGLE:
+        if spec.wallet_type in GOOGLE_WALLET_TYPES:
             if spec.issuer_id is None:
                 raise ProblemError(
                     409,
@@ -718,7 +758,7 @@ class RenderService:
                     # is the desired end state.
                     pass
             return RenderResult(
-                wallet_type=WalletType.GOOGLE,
+                wallet_type=WalletType.GOOGLE_ST,
                 object_id=object_id,
                 class_id=variant.google_class_id,
                 template_version=version.number,

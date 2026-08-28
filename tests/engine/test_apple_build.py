@@ -8,7 +8,7 @@ from edutap.pass_builder.models.enums import TargetKind, ValueType, WalletType
 def test_serial_number_is_set_and_bytes_returned():
     """build_apple sets the serial number and returns .pkpass bytes."""
     spec = RenderSpec(
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         pass_json={
             "formatVersion": 1,
             "description": "Test pass",
@@ -46,7 +46,7 @@ def test_serial_number_is_set_and_bytes_returned():
 def test_build_apple_does_not_mutate_input_spec():
     """build_apple does not mutate the caller's input RenderSpec."""
     spec = RenderSpec(
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         pass_json={
             "formatVersion": 1,
             "description": "Test pass",

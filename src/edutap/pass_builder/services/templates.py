@@ -26,7 +26,15 @@ from ..models.db import (
     TemplateVariant,
     TemplateVersion,
 )
-from ..models.enums import RuleOrigin, TargetKind, ValueType, VersionStatus, WalletType
+from ..models.enums import (
+    APPLE_WALLET_TYPES,
+    GOOGLE_WALLET_TYPES,
+    RuleOrigin,
+    TargetKind,
+    ValueType,
+    VersionStatus,
+    WalletType,
+)
 from .mapping_validation import validate_mapping_rules
 
 _GOOGLE_CLASS_MODEL = "Class"
@@ -259,7 +267,7 @@ class TemplateService:
                 findings=problems,
             )
 
-        if variant.wallet_type == WalletType.GOOGLE:
+        if variant.wallet_type in GOOGLE_WALLET_TYPES:
             derived = [
                 RuleSpec(
                     target_kind=TargetKind.JSON_POINTER,
@@ -315,7 +323,7 @@ class TemplateService:
         ]
 
         issuer_id: str | None = None
-        if wallet_type == WalletType.GOOGLE and variant.credential_set_id is not None:
+        if wallet_type in GOOGLE_WALLET_TYPES and variant.credential_set_id is not None:
             credential_set = await self._load_credential_set(
                 tenant_id, variant.credential_set_id
             )
@@ -494,7 +502,7 @@ class TemplateService:
         needs a `SecretBackend`.
         """
         variant = await self._load_variant(tenant_id, variant_id)
-        if variant.wallet_type != WalletType.GOOGLE:
+        if variant.wallet_type not in GOOGLE_WALLET_TYPES:
             raise ProblemError(
                 400, "invalid_request", "sync is only valid for Google variants"
             )
@@ -704,7 +712,7 @@ class TemplateService:
         ]
         problems.extend(validate_mapping_rules(authored_rules, catalogue))
 
-        if variant.wallet_type == WalletType.APPLE:
+        if variant.wallet_type in APPLE_WALLET_TYPES:
             filenames = {asset.filename for asset in await self.list_assets(version.id)}
             if _APPLE_ICON not in filenames:
                 problems.append(f"missing required asset: {_APPLE_ICON}")
@@ -728,12 +736,12 @@ class TemplateService:
         `pass_json`.
         """
         problems: list[str] = []
-        if variant.wallet_type == WalletType.APPLE:
+        if variant.wallet_type in APPLE_WALLET_TYPES:
             if version.pass_json is None:
                 problems.append("apple variant requires pass_json to be set")
             if version.class_json is not None or version.object_json is not None:
                 problems.append("apple variant must not set class_json or object_json")
-        elif variant.wallet_type == WalletType.GOOGLE:
+        elif variant.wallet_type in GOOGLE_WALLET_TYPES:
             if version.class_json is None or version.object_json is None:
                 problems.append(
                     "google variant requires both class_json and object_json"

@@ -26,7 +26,7 @@ async def test_only_one_default_variant_per_wallet_type(session):
     session.add(
         TemplateVariant(
             template_id=template.id,
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             key="student",
             name="Student",
             is_default=True,
@@ -36,7 +36,7 @@ async def test_only_one_default_variant_per_wallet_type(session):
     session.add(
         TemplateVariant(
             template_id=template.id,
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             key="staff",
             name="Staff",
             is_default=True,

@@ -146,7 +146,7 @@ async def _seed_published_apple_template(session, tenant_id: UUID) -> TemplateVa
 
     variant = TemplateVariant(
         template_id=template.id,
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         key="student",
         name="Student",
         is_default=True,
@@ -215,7 +215,7 @@ async def _seed_published_google_template(
 
     variant = TemplateVariant(
         template_id=template.id,
-        wallet_type=WalletType.GOOGLE,
+        wallet_type=WalletType.GOOGLE_ST,
         key="staff",
         name="Staff",
         is_default=True,
@@ -315,7 +315,7 @@ async def test_create_apple_pass_requests_only_mapped_fields(render_env):
         env.auth,
         pass_id="11111111-1111-1111-1111-111111111111",  # noqa: S106 - pass_id is an identifier, not a secret
         template_key="student-id",
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         variant_key=None,
         person_uid="u1",
         version_number=None,
@@ -331,7 +331,7 @@ async def test_create_apple_pass_writes_success_audit(render_env):
         env.auth,
         pass_id="11111111-1111-1111-1111-111111111111",  # noqa: S106 - pass_id is an identifier, not a secret
         template_key="student-id",
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         variant_key=None,
         person_uid="u1",
         version_number=None,
@@ -354,7 +354,7 @@ async def test_missing_field_writes_error_audit_and_raises(render_env):
             env.auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="student-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             variant_key=None,
             person_uid="u1",
             version_number=None,
@@ -377,7 +377,7 @@ async def test_missing_field_error_lists_field_names_not_values(render_env):
             env.auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="student-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             variant_key=None,
             person_uid="u1",
             version_number=None,
@@ -394,7 +394,7 @@ async def test_unknown_template_writes_error_audit_with_no_ids(render_env):
             env.auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="no-such-template",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             variant_key=None,
             person_uid="u1",
             version_number=None,
@@ -432,7 +432,7 @@ async def test_create_google_pass_pushes_object_and_returns_ids(session):
         auth,
         pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
         template_key="staff-id",
-        wallet_type=WalletType.GOOGLE,
+        wallet_type=WalletType.GOOGLE_ST,
         variant_key=None,
         person_uid="u1",
         version_number=None,
@@ -466,7 +466,7 @@ async def test_create_google_pass_treats_409_as_success(session):
         auth,
         pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
         template_key="staff-id",
-        wallet_type=WalletType.GOOGLE,
+        wallet_type=WalletType.GOOGLE_ST,
         variant_key=None,
         person_uid="u1",
         version_number=None,
@@ -494,7 +494,7 @@ async def test_update_google_pass_uses_update_not_create(session):
         auth,
         pass_id="abc-uuid",  # noqa: S106 - pass_id is an identifier, not a secret
         template_key="staff-id",
-        wallet_type=WalletType.GOOGLE,
+        wallet_type=WalletType.GOOGLE_ST,
         variant_key=None,
         person_uid="u1",
         version_number=None,
@@ -536,16 +536,53 @@ async def test_save_link_returns_google_save_url(session):
     assert credentials is not None
 
 
-async def test_save_link_raises_not_implemented_for_apple(render_env):
-    """save_link has no Apple equivalent; it says so instead of guessing."""
+async def test_save_link_answers_501_for_apple(render_env):
+    """save_link has no Apple equivalent; it says so as a 501, not as a crash.
+
+    It raised `NotImplementedError` until 2026-08-28. That reaches the caller as a
+    500 -- "our fault, try again" -- for something that is neither our fault nor
+    worth retrying. A `ProblemError(501)` says what it is, and matches what
+    `deactivate_pass` already answered for the same situation.
+    """
     env = render_env
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ProblemError) as raised:
         await env.service.save_link(
             env.auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="student-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
         )
+    assert raised.value.status == 501
+    assert raised.value.slug == "wallet_type_not_supported"
+
+
+@pytest.mark.parametrize(
+    "wallet_type",
+    [WalletType.APPLE_ACCESS, WalletType.APPLE_IDENTITY, WalletType.GOOGLE_IDENTITY],
+)
+async def test_rendering_answers_501_for_a_technology_this_service_cannot_build(
+    render_env, wallet_type
+):
+    """Access and Identity are credential technologies, not variants of VAS.
+
+    They involve secure element provisioning, which this service does not do at all.
+    A 501 rather than a 400: the request is well formed and the wallet type is real.
+
+    THE GATE SITS BEFORE THE AUDIT ENTRY, deliberately -- a request that was never
+    going to happen should not leave a row that looks like attempted work.
+    """
+    env = render_env
+    with pytest.raises(ProblemError) as raised:
+        await env.service.create_pass(
+            env.auth,
+            pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
+            template_key="student-id",
+            wallet_type=wallet_type,
+            variant_key=None,
+            person_uid="p1",
+        )
+    assert raised.value.status == 501
+    assert raised.value.slug == "wallet_type_not_supported"
 
 
 # --- deactivate_pass -------------------------------------------------------------
@@ -673,7 +710,7 @@ async def test_deactivate_pass_refuses_apple_with_501(render_env):
             env.auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="student-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
         )
 
     assert caught.value.status == 501
@@ -694,7 +731,7 @@ async def test_a_refused_withdrawal_is_still_audited(render_env):
             env.auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="student-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
         )
 
     entries = await env.list_audit()
@@ -715,7 +752,7 @@ async def test_preview_does_not_call_data_provider_or_write_audit(render_env):
     preview = await env.service.preview(
         env.auth,
         template_key="student-id",
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         variant_key=None,
         version_number=None,
         sample_data={},
@@ -735,7 +772,7 @@ async def test_preview_uses_provided_sample_data_over_placeholder(render_env):
     preview = await env.service.preview(
         env.auth,
         template_key="student-id",
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         variant_key=None,
         version_number=None,
         sample_data={"person.name": "Grace Hopper"},
@@ -759,7 +796,7 @@ async def test_preview_does_not_mutate_the_stored_pass_json(render_env):
     await env.service.preview(
         env.auth,
         template_key="student-id",
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         variant_key=None,
         version_number=None,
         sample_data={"person.name": "Grace Hopper"},
@@ -796,7 +833,7 @@ async def test_apple_nfc_payload_too_long_returns_422_and_is_audited(session):
 
     variant = TemplateVariant(
         template_id=template.id,
-        wallet_type=WalletType.APPLE,
+        wallet_type=WalletType.APPLE_VAS,
         key="student",
         name="Student",
         is_default=True,
@@ -850,7 +887,7 @@ async def test_apple_nfc_payload_too_long_returns_422_and_is_audited(session):
             auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="nfc-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             variant_key=None,
             person_uid="u1",
             version_number=None,
@@ -900,7 +937,7 @@ async def test_unexpected_error_writes_audit_and_becomes_500(session):
             auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="student-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             variant_key=None,
             person_uid="u1",
             version_number=None,
@@ -961,7 +998,7 @@ async def test_credential_from_other_tenant_is_not_used(session):
             auth,
             pass_id="1",  # noqa: S106 - pass_id is an identifier, not a secret
             template_key="student-id",
-            wallet_type=WalletType.APPLE,
+            wallet_type=WalletType.APPLE_VAS,
             variant_key=None,
             person_uid="u1",
             version_number=None,
