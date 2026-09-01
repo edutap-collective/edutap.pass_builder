@@ -28,6 +28,19 @@ dependencies = [
     # enum is a second truth, and the copy that stood in `models/enums.py` was on the
     # coarse provider axis -- it could not express VAS versus Access at all.
     "edutap.data_models>=0.3,<0.4",
+    # How this service reaches the cluster: every node, the primary among them,
+    # TLS per driver, and the password as a mounted file. All of it lives in
+    # `ClusterSettings`, so this is a runtime dependency now and no longer only
+    # the development one the entry point below needs.
+    #
+    # NOT BELOW 0.3.2. Earlier versions declare no `secrets_dir`, and the failure
+    # mode of that is silence: the mounted password is never read, and nothing
+    # observable separates it from a deployment that has no secret at all. It
+    # crash-looped two sibling services on 2026-08-27 for exactly that reason.
+    "edutap.db_definitions>=0.3.2,<0.4",
+    # Errors, traces and structured logging. `[fastapi]` because this service is
+    # one, and the extra is what carries the instrumentation.
+    "edutap.observability_settings[fastapi]>=0.1.6,<0.2",
     "edutap.wallet-apple>=1.0.0a2",
     "edutap.wallet-google>=3.0.0b1",
     "fastapi>=0.115",
@@ -56,8 +69,10 @@ docs = ["myst-parser", "sphinx>=8"]
 # one database; the tool scans this entry point to check them against each other
 # for colliding names and for types left to `search_path`.
 #
-# It is a *development* dependency and never a runtime one -- `models/dbdef.py`
-# guards the import so a deployment without the tool imports cleanly.
+# The package is a runtime dependency since 2026-09-01 (`ClusterSettings`), so
+# `models/dbdef.py` imports it directly. The guard that used to sit there could
+# no longer trigger, and a guard that cannot trigger asserts a design that is no
+# longer true.
 [project.entry-points."edutap.db_definitions"]
 schema = "edutap.pass_builder.models.dbdef:definition"
 

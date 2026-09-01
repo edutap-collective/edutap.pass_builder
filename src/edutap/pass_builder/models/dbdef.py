@@ -5,25 +5,22 @@ entry point to check this package against the others that share the database;
 the Alembic `env.py` reads the plain constants above it. Declaring either of
 them twice is how they drift.
 
-`edutap.db_definitions` is a development dependency, never a runtime one -- the
-service never calls it, only the separate CLI tool that renders and applies DDL.
-The import is therefore guarded, so that a deployment without the tool installed
-can still import this module cleanly; `definition` is `None` in that case. That
-guard is also why `env.py` reads the constants rather than `definition`: the
-migrations run in production, where the tool is absent.
+`edutap.db_definitions` used to be a development dependency, and this import was
+guarded so a deployment without the tool could still import this module --
+`definition` was `None` in that case. Since 2026-09-01 the package is a runtime
+dependency: `ClusterSettings` is how this service reaches the cluster at all. The
+guard could no longer trigger, and a guard that cannot trigger asserts a design
+that is no longer true, so it is gone.
+
+`env.py` still reads the plain constants rather than `definition` -- not because
+the tool might be absent, but because a migration needs the version table and the
+owned schemas, not a description of the package for a cross-package check.
 """
 
 from collections.abc import Callable
 from typing import Any
 
-try:
-    # ty: ignore[unresolved-import] -- absent on purpose. The tool is a
-    # development helper, not a runtime dependency, and the `except` below is
-    # the whole point of this block; see the module docstring. A type checker
-    # reporting it as missing is reporting the design.
-    from edutap.db_definitions import SchemaDefinition
-except ModuleNotFoundError:  # pragma: no cover - the service does not need the tool
-    SchemaDefinition = None  # type: ignore[assignment]
+from edutap.db_definitions import SchemaDefinition
 
 from . import db  # noqa: F401  importing registers the tables on the metadata
 from .base import metadata
@@ -119,12 +116,8 @@ def include_name_for(
     return include_name
 
 
-definition = (
-    SchemaDefinition(
-        name=PACKAGE_NAME,
-        metadata=metadata,
-        version_table=VERSION_TABLE,
-    )
-    if SchemaDefinition is not None
-    else None
+definition = SchemaDefinition(
+    name=PACKAGE_NAME,
+    metadata=metadata,
+    version_table=VERSION_TABLE,
 )

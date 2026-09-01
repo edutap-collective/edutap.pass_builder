@@ -7,7 +7,11 @@ The settings model is `edutap.pass_builder.settings.Settings`.
 
 | Variable | Type | Default | Required |
 |---|---|---|---|
-| `EDUTAP_PASS_BUILDER_DATABASE_URL` | string | — | yes |
+| `EDUTAP_PASS_BUILDER_DB_HOSTS` | string | — | yes |
+| `EDUTAP_PASS_BUILDER_DB_DATABASE` | string | — | yes |
+| `EDUTAP_PASS_BUILDER_DB_USER` | string | — | yes |
+| `EDUTAP_PASS_BUILDER_DB_PASSWORD` | secret string | — | yes |
+| `EDUTAP_PASS_BUILDER_DB_SSLMODE` | string | driver default | no |
 | `EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY` | secret string | — | yes |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL` | string | — | yes |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_TOKEN` | secret string | `""` (unset) | no |
@@ -19,15 +23,48 @@ The settings model is `edutap.pass_builder.settings.Settings`.
 | `EDUTAP_PASS_BUILDER_WWDR_CERTIFICATE_PATH` | path | `assets/wwdr-g4.pem` | no |
 | `EDUTAP_PASS_BUILDER_AUDIT_RETENTION_MONTHS` | integer | `24` | no |
 
-## `DATABASE_URL`
+## `DB_*`
 
-An async SQLAlchemy connection string.
-The service is built against `asyncpg`, so it must use the
-`postgresql+asyncpg://` scheme:
+Where the cluster is, spelled as fields rather than as one DSN.
+`DatabaseSettings` derives from
+`edutap.db_definitions.settings.ClusterSettings`, which builds the async URL
+from them.
+
+`DB_HOSTS` names **every** node, comma separated, each optionally with its own
+port:
 
 ```text
-postgresql+asyncpg://user:password@host:5432/dbname
+EDUTAP_PASS_BUILDER_DB_HOSTS=pg-a,pg-b:5433,pg-c
 ```
+
+Naming a single node is what breaks at the next failover.
+`target_session_attrs=read-write` selects the primary among them; without it a
+connection lands on a replica, *succeeds*, and only the first write fails — so
+the mistake surfaces far from its cause.
+
+There is deliberately no `DATABASE_URL`.
+It existed until 2026-09-01 and carried the password inside the string, which
+kept it in the process environment — and therefore in `docker inspect` and in
+the frame locals an error tracker collects.
+
+## Secrets as files
+
+`Settings` and `DatabaseSettings` both declare `secrets_dir=/run/secrets`, so
+the master key, the database password and the object-store key can arrive as
+mounted files instead of environment values.
+
+`pydantic-settings` has **no `_FILE` convention**.
+It reads a secret file only where `secrets_dir` points, and the file name
+carries the prefix:
+
+```text
+/run/secrets/EDUTAP_PASS_BUILDER_secret_master_key
+/run/secrets/EDUTAP_PASS_BUILDER_DB_password
+```
+
+A secret mounted under the bare field name is silently ignored.
+A missing directory is harmless — `pydantic-settings` warns and falls back to
+the environment, so a development machine without `/run/secrets` is unaffected.
 
 ## `SECRET_MASTER_KEY`
 

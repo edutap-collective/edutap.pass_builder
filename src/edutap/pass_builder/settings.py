@@ -4,8 +4,65 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from edutap.db_definitions.settings import ASYNC_DRIVER, ClusterSettings
 from pydantic import HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+SECRETS_DIR = "/run/secrets"
+"""Where an orchestrator mounts secrets.
+
+pydantic-settings reads from here, so the master key, the database password
+and the object-store key arrive as files instead of environment values -- and
+are then never in the process environment at all, which means never in
+`docker inspect` and never in a frame local an error tracker collects.
+
+Two things worth knowing before wiring this up:
+
+* **The file name carries the `env_prefix`**, so the master key is read from
+  `/run/secrets/EDUTAP_PASS_BUILDER_secret_master_key`, not `.../secret_master_key`.
+  A secret mounted under the bare field name is silently ignored -- there is no
+  `_FILE` convention in pydantic-settings.
+* **A missing directory is harmless.** pydantic-settings emits a `UserWarning`
+  and falls back to the environment, so a developer without `/run/secrets` is
+  not blocked. That is why this can be the default rather than a switch.
+"""
+
+
+class DatabaseSettings(ClusterSettings):
+    """How this service reaches its Postgres cluster, prefix `EDUTAP_PASS_BUILDER_DB_`.
+
+    Everything about *reaching* a cluster -- naming every node, asking for the
+    one that accepts writes, spelling TLS the way each driver wants it -- comes
+    from :class:`edutap.db_definitions.settings.ClusterSettings`.
+
+    Until 2026-09-01 this service read a single `database_url`. That form names
+    one node, which is what breaks at the next failover, and it carries the
+    password inside the string, which is what keeps it in the environment.
+
+    **The four fields are re-declared without defaults on purpose.** The base
+    gives them ones that suit a development machine, and a default is exactly
+    wrong here: a deployment that misspells the prefix would then start cleanly
+    and write into *some* database rather than abort.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="EDUTAP_PASS_BUILDER_DB_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        secrets_dir=SECRETS_DIR,
+        extra="ignore",
+    )
+
+    #: Every node of the cluster, comma separated -- see :class:`ClusterSettings`.
+    hosts: str
+    database: str
+    user: str
+    password: SecretStr
+
+    @property
+    def async_url(self) -> str:
+        """Return the DSN for the async driver this service uses."""
+        return self.url(ASYNC_DRIVER)
 
 
 class Settings(BaseSettings):
@@ -14,16 +71,28 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="EDUTAP_PASS_BUILDER_",
         env_file=".env",
+        secrets_dir=SECRETS_DIR,
         extra="ignore",
     )
 
-    database_url: str
     secret_master_key: SecretStr
     """Base64 encoded 32 byte AES key wrapping the per-secret data keys."""
 
     data_provider_base_url: str
     data_provider_token: SecretStr = SecretStr("")
     data_provider_timeout: float = 10.0
+
+    image_service_base_url: str = "http://image_service:8000"
+    """Where an `IMAGE` mapping rule's reference is fetched from.
+
+    A rule binds a URL and this service fetches the bytes. It used to bind
+    `bytes` directly, which could never work: the data provider answers JSON,
+    and JSON has no bytes -- so the value arrived as a string, the asset was
+    never written, and the pass published green without its picture.
+    """
+
+    image_service_token: SecretStr = SecretStr("")
+    image_service_timeout: float = 10.0
 
     objectstore_endpoint_url: str = "http://localhost:9000"
     objectstore_bucket: str = "pass-builder"
@@ -74,3 +143,14 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return the process-wide settings instance."""
     return Settings()
+
+
+@lru_cache
+def get_database_settings() -> DatabaseSettings:
+    """Return the process-wide database settings.
+
+    Separate from :func:`get_settings` because it is a separate class with a
+    separate prefix, and because the two are read at different moments: the
+    engine needs this one, every request needs the other.
+    """
+    return DatabaseSettings()

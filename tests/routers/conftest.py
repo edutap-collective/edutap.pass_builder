@@ -46,9 +46,6 @@ from edutap.pass_builder.models.enums import Scope
 # these router tests (no other test module resolves it), so setting them
 # once at collection time is safe and does not leak into other suites.
 os.environ.setdefault(
-    "EDUTAP_PASS_BUILDER_DATABASE_URL", "postgresql+asyncpg://unused/unused"
-)
-os.environ.setdefault(
     "EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY",
     base64.b64encode(os.urandom(32)).decode(),
 )

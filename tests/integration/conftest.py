@@ -112,7 +112,6 @@ async def e2e_env(session) -> AsyncIterator[E2eEnv]:
     # environment variable needed, proving this project's own setting
     # actually drives WWDR resolution.
     settings = Settings(
-        database_url="postgresql+asyncpg://unused/unused",
         secret_master_key=base64.b64encode(os.urandom(32)).decode(),
         data_provider_base_url="http://data-provider.invalid",
         wwdr_certificate_path=wwdr_path,

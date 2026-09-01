@@ -17,7 +17,7 @@ from edutap.pass_builder.models.dbdef import (
     include_name_for,
     require_version_table_schema,
 )
-from edutap.pass_builder.settings import get_settings
+from edutap.pass_builder.settings import get_database_settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -28,10 +28,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# The database URL always comes from the application's own Settings (so it
-# reads the same EDUTAP_PASS_BUILDER_DATABASE_URL environment variable the
-# service itself uses) rather than from a hardcoded value in alembic.ini.
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# The database URL always comes from the application's own DatabaseSettings (so
+# it reads the same EDUTAP_PASS_BUILDER_DB_* variables and the same mounted
+# password the service itself uses) rather than from a hardcoded value in
+# alembic.ini. That matters beyond tidiness: a migration run that reached a
+# replica would succeed at connecting and fail at the first DDL, far from its
+# cause -- `target_session_attrs=read-write` is what keeps it on the primary.
+config.set_main_option("sqlalchemy.url", get_database_settings().async_url)
 
 # The package's OWN metadata, not the global `SQLModel.metadata`. Several
 # packages share this database, and the global singleton cannot tell them
