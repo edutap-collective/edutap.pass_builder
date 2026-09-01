@@ -24,6 +24,7 @@ def _to_response(entry: AuditLog) -> AuditEntryResponse:
         ts=entry.ts,
         request_id=entry.request_id,
         actor_client_id=entry.actor_client_id,
+        actor_principal=entry.actor_principal,
         action=entry.action,
         outcome=entry.outcome,
         error_code=entry.error_code,

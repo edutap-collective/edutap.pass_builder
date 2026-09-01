@@ -340,6 +340,22 @@ class AuditLog(Base, table=True):
     )
     request_id: str = Field(index=True)
     actor_client_id: UUID | None = Field(default=None, foreign_key="api_client.id")
+    """The machine credential that acted, where one did."""
+
+    actor_principal: str | None = Field(default=None, index=True)
+    """The person that acted, where one did -- the management UI's caller.
+
+    A second actor column rather than a wider `actor_client_id`, because
+    that one is a foreign key into `api_client` and a person has no row
+    there. Without this the actions with the highest consequence --
+    uploading a signing credential, publishing a version -- would be
+    recorded with no actor at all, which reads exactly like an entry whose
+    actor was never captured.
+
+    Exactly one of the two is set. Deliberately not a CHECK constraint yet:
+    `actor_client_id` has been nullable since the first migration and this
+    is not the change that should decide what a pre-existing NULL means.
+    """
     action: str
     outcome: str
     error_code: str | None = None

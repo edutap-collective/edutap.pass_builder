@@ -280,6 +280,7 @@ class AuditEntryResponse(BaseModel):
     ts: datetime
     request_id: str
     actor_client_id: UUID | None = None
+    actor_principal: str | None = None
     action: str
     outcome: str
     error_code: str | None = None

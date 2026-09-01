@@ -90,6 +90,7 @@ class audited:
             tenant_id=self._auth.tenant_id,
             request_id=self._request.headers.get("x-request-id") or "",
             actor_client_id=self._auth.client_id,
+            actor_principal=self._auth.principal,
             action=self._action,
             outcome="error",
             error_code=error_code,

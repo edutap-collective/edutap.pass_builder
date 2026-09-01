@@ -53,6 +53,7 @@ async def _audit(
         tenant_id=auth.tenant_id,
         request_id=request.headers.get("x-request-id") or "",
         actor_client_id=auth.client_id,
+        actor_principal=auth.principal,
         action=action,
         outcome="success",
         error_code=None,

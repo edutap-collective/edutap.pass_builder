@@ -4,6 +4,7 @@ from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.auth import (
     AuthContext,
+    current_auth,
     hash_token,
     require,
     resolve_token,
@@ -52,8 +53,6 @@ async def test_missing_bearer_header_is_unauthenticated(session):
     """Request with missing or malformed Authorization header returns 401."""
     await seed(session)
 
-    dependency = require(Scope.MANAGE)
-
     # Test with missing Authorization header
     scope = {
         "type": "http",
@@ -62,7 +61,7 @@ async def test_missing_bearer_header_is_unauthenticated(session):
     }
     request = Request(scope)
     with pytest.raises(ProblemError) as excinfo:
-        await dependency(request, session)
+        await current_auth(request, session)
     assert excinfo.value.status == 401
     assert excinfo.value.slug == "unauthenticated"
 
@@ -74,7 +73,7 @@ async def test_missing_bearer_header_is_unauthenticated(session):
     }
     request = Request(scope)
     with pytest.raises(ProblemError) as excinfo:
-        await dependency(request, session)
+        await current_auth(request, session)
     assert excinfo.value.status == 401
     assert excinfo.value.slug == "unauthenticated"
 
@@ -104,8 +103,9 @@ async def test_insufficient_scope_is_forbidden(session):
         "headers": [(b"authorization", b"Bearer render-token")],
     }
     request = Request(scope)
+    auth = await current_auth(request, session)
     with pytest.raises(ProblemError) as excinfo:
-        await dependency(request, session)
+        await dependency(auth)
     assert excinfo.value.status == 403
     assert excinfo.value.slug == "insufficient_scope"
 
@@ -126,8 +126,6 @@ async def test_inactive_client_is_unauthenticated(session):
     )
     await session.flush()
 
-    dependency = require(Scope.MANAGE)
-
     scope = {
         "type": "http",
         "method": "GET",
@@ -135,6 +133,6 @@ async def test_inactive_client_is_unauthenticated(session):
     }
     request = Request(scope)
     with pytest.raises(ProblemError) as excinfo:
-        await dependency(request, session)
+        await current_auth(request, session)
     assert excinfo.value.status == 401
     assert excinfo.value.slug == "unauthenticated"

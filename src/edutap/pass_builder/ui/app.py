@@ -13,10 +13,21 @@ import httpx
 from fastapi import APIRouter, FastAPI
 
 from ..app import exports_to_a_collector, observability  # noqa: F401  (shared install)
+from ..auth import current_auth
 from ..errors import install_error_handlers
-from ..routers import health
+from ..routers import audit, credentials, fields, health, templates
 from ..settings import get_settings
+from .auth import ui_auth_context
 from .routers import tenants
+
+TENANT_PREFIX = "/tenants/{tenant_id}"
+"""Where the reused management routers hang.
+
+A token names exactly one tenant, so the render API never has to say which; a
+person does not, so the UI does. Everything below this prefix is still
+tenant-scoped by that value -- what changes is where it comes from, not
+whether it applies.
+"""
 
 UI_PREFIX = "/builder-ui/v1"
 """The UI's path inside its zone.
@@ -56,7 +67,26 @@ def create_ui_app() -> FastAPI:
 
     api = APIRouter(prefix=UI_PREFIX)
     api.include_router(tenants.router)
+
+    # The management routers themselves, unchanged and unduplicated.
+    #
+    # `passes.router` is deliberately absent: rendering a person's pass is not
+    # a management action, and the UI has no reason to be able to do it. It
+    # also keeps this application free of the one route whose zone matters.
+    managed = APIRouter(prefix=TENANT_PREFIX)
+    for router in (
+        templates.router,
+        credentials.router,
+        fields.router,
+        audit.router,
+    ):
+        managed.include_router(router)
+    api.include_router(managed)
     app.include_router(api)
+
+    # The seam. Those routers ask `current_auth` who is calling; here a person
+    # answers, and the tenant comes from the path segment above.
+    app.dependency_overrides[current_auth] = ui_auth_context
 
     # Outside UI_PREFIX, like the render application's: liveness and readiness
     # must be reachable without knowing the mount point.
