@@ -49,16 +49,66 @@ off a publicly reachable entry point. Splitting by router would make that
 boundary a label rather than a zone, and a label is the kind of boundary that
 falls silently during the next rework.
 
-**The UI calls the service layer directly.** `TemplateService`,
-`CredentialService`, `validate_mapping_rules` and `write_audit` — the same
-objects the routers use, with their own session. Going out to HTTP and back
-would buy nothing and would need a token this application does not have.
+**The UI mounts the management routers themselves.** `templates`,
+`credentials`, `fields` and `audit`, under `/tenants/{tenant_id}`, with one
+dependency overridden.
 
-This is why the service layer stays the place where the guarantees live, and why
-none of them may migrate into the routers: a published version stays immutable,
-mapping rules are validated against the field catalogue, secret material stays
-wrapped under the master key, and every management action leaves an audit row —
-for the UI exactly as for a REST caller.
+*Refined during implementation, same day.* The intention above was that the UI
+would call `TemplateService` and `CredentialService` directly. Writing it made
+the better seam obvious: those routers are already thin wrappers over exactly
+those services, and restating them would produce a second set of route bodies —
+a second place deciding what publishing checks and how a credential is sealed.
+It is the copy that stops being maintained.
+
+What made it possible is a change in `auth.py`. `require(*scopes)` used to
+establish the caller *and* check the scopes, and every call to it returns a
+distinct function object, so `dependency_overrides` could never reach it.
+Establishing the caller now lives in `current_auth`, which `require` depends on
+— one dependency, overridable, and the scope check unchanged.
+
+Two things differ under the UI's override, both deliberate:
+
+* **The tenant comes from the path.** A token belongs to exactly one tenant; a
+  person does not. Every service call below is still scoped by that value.
+* **Every scope is granted.** Scopes limit what one machine credential may do;
+  a person allow-listed for this UI is allow-listed for what it offers. Which
+  is why `passes` is *not* mounted — rendering a person's pass is not a
+  management action, and leaving it out keeps this application free of the one
+  route whose zone matters.
+
+The service layer therefore stays the place where the guarantees live: a
+published version stays immutable, mapping rules are validated against the
+field catalogue, secret material stays wrapped under the master key, and every
+management action leaves an audit row — for the UI exactly as for a REST
+caller, because it is the same code.
+
+### The audit log could not name a person
+
+`AuditLog.actor_client_id` is a foreign key into `api_client`. A person has no
+row there, so every action the UI performs would have been recorded with no
+actor at all — and a `NULL` there is indistinguishable from an entry whose
+actor was never captured. The actions in question are uploading a signing
+credential and publishing a version: the two worth asking about a year later.
+
+Migration 0003 adds `actor_principal`. A second column rather than a wider
+first one, because the foreign key is what makes `actor_client_id` answer
+"which service" rather than "some string somebody wrote".
+
+### The field catalogue leaves through the same door
+
+`GET /fields/catalogue.json` returns the cached `DataField` rows in the shape
+`edutap.pass_designer` loads (`PASS_DESIGNER_CATALOGUE_PATH`).
+
+The designer lays a pass out against a field list, and this service validates
+every mapping rule against one. Two files means a rule authored in the designer
+fails at publish time and nothing before that says why. Deliberately the
+*cached* rows and not a live call to the data provider: the cache is what a
+rule is validated against, so it has to be what the designer draws against.
+
+Nothing else has to travel. The designer's `class.json` and `object.json` are
+the body of `POST /variants/{id}/versions`, and its `mappings.json` is already
+`MappingRulesRequest` — its extra `unknown_fields` key is ignored, which is
+what lets the file be posted as it stands.
 
 ## Frontend
 
