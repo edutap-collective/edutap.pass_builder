@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Protocol
 from uuid import UUID, uuid4
 
+from edutap.data_models.vocabulary import IssuanceState
+from edutap.db_definitions.public.tables import PassState
 from edutap.wallet_google import api as wallet_google_api
 from edutap.wallet_google.exceptions import ObjectAlreadyExistsException
 from pydantic import BaseModel
@@ -752,6 +754,100 @@ class RenderService:
                 "One or more required fields were not returned by the data provider",
                 fields=exc.fields,
             ) from exc
+
+    async def fetch_apple_pass(
+        self,
+        auth: AuthContext,
+        *,
+        pass_type_identifier: str,
+        serial_number: str,
+        request_id: str | None = None,
+    ) -> RenderResult:
+        """Rebuild an issued Apple pass from Apple's key alone.
+
+        THE DELIVERY PATH. `wallet_apple_vas_web_service` holds registrations
+        and nothing else -- it knows no person, no template and no validity,
+        which is what makes it reusable at another institution -- so it asks
+        for the current pass by `passTypeIdentifier` and `serialNumber`.
+
+        THIS SERVICE STILL KEEPS NO PASS REGISTER. It does not learn that a
+        pass exists, does not record one, and does not track its life; it reads
+        `public.pass_state`, which the pass-state consumer owns and writes, to
+        recover the two things Apple's key cannot carry: which person the pass
+        is for and which template it was built from. Reading a table in the
+        shared contract schema is what that schema is for. The distinction is
+        worth holding on to -- it is the same one that makes `deactivate` a
+        `POST` rather than a `DELETE`.
+
+        Rebuilt rather than stored: the pass a device fetches is the pass the
+        current template version and the person's current data produce. A
+        stored copy would be a second truth with an unbounded staleness and a
+        personal pass sitting at rest.
+
+        `pass_type_identifier` is checked against the variant's credential set,
+        which carries the identifier parsed out of the signing certificate. It
+        is a guard rather than a lookup key: the tenant already comes from the
+        token, and without the check a caller could fetch any serial number of
+        that tenant under any pass type it liked.
+        """
+        state = (
+            await self._session.execute(
+                select(PassState).where(
+                    PassState.pass_id  # ty: ignore[invalid-argument-type]
+                    == serial_number
+                )
+            )
+        ).scalar_one_or_none()
+        if state is None:
+            raise ProblemError(404, "pass_not_found", "No such pass")
+        if state.issuance_state == IssuanceState.REVOKED:
+            # 410 and not 404: the pass existed and was withdrawn, and the
+            # difference matters to the caller -- a device asking for a revoked
+            # pass should stop asking, while a 404 invites a retry.
+            raise ProblemError(410, "pass_revoked", "This pass has been withdrawn")
+        if state.wallet_type not in APPLE_WALLET_TYPES:
+            raise ProblemError(
+                404, "pass_not_found", "No Apple pass with that serial number"
+            )
+
+        template, variant, _version = await self._resolve(
+            auth.tenant_id,
+            state.pass_template,
+            state.wallet_type,
+            state.pass_template_variant,
+            None,
+        )
+        await self._require_pass_type(auth.tenant_id, variant, pass_type_identifier)
+
+        return await self._render(
+            auth,
+            pass_id=serial_number,
+            template_key=template.key,
+            wallet_type=state.wallet_type,
+            variant_key=state.pass_template_variant,
+            person_uid=state.person_uid,
+            version_number=None,
+            request_id=request_id,
+            action="pass.fetch",
+            is_update=False,
+        )
+
+    async def _require_pass_type(
+        self, tenant_id: UUID, variant: TemplateVariant, expected: str
+    ) -> None:
+        """Refuse a serial number fetched under the wrong pass type.
+
+        `404` rather than `403`, and the same answer as an unknown serial
+        number: a caller must not be able to learn which serial numbers exist
+        under a pass type it is not asking about.
+        """
+        credential_set = await self._load_credential_set(
+            tenant_id, variant.credential_set_id
+        )
+        if credential_set is None or credential_set.pass_type_identifier != expected:
+            raise ProblemError(
+                404, "pass_not_found", "No Apple pass with that serial number"
+            )
 
     async def _build_and_deliver(
         self,
