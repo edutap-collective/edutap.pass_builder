@@ -102,6 +102,19 @@ class SupportsGoogleApi(Protocol):
         ...
 
 
+class SupportsImageFetch(Protocol):
+    """What the render path needs of `clients.image_service.ImageServiceClient`.
+
+    A `Protocol` rather than the concrete class, for the same reason as
+    `SupportsGoogleApi` above: a unit test can hand in a fake that reaches no
+    network and still type-check.
+    """
+
+    async def fetch(self, url: str) -> bytes:
+        """Return the bytes behind an image reference."""
+        ...
+
+
 def _elapsed_ms(start: float) -> int:
     """Return the milliseconds elapsed since `start` (a `time.monotonic()`)."""
     return int((time.monotonic() - start) * 1000)
@@ -130,6 +143,44 @@ def _require_supported(wallet_type: WalletType) -> None:
         )
 
 
+async def resolve_image_references(
+    bound: list[BoundValue], images: SupportsImageFetch | None
+) -> list[BoundValue]:
+    """Replace every `IMAGE` reference with the bytes it points at.
+
+    THE APPLE PATH ONLY, and the asymmetry is the platforms', not ours: a
+    `.pkpass` is a bundle and carries the picture as a file inside it, so the
+    reference has to become bytes before the bundle is built. A Google object
+    carries images by URL and the wallet fetches them itself, so there the
+    reference already *is* the right value -- fetching it would put a copy of a
+    person's photograph somewhere Google never reads.
+
+    A value that is already bytes is left alone. Only `preview` produces one,
+    and a preview reaches no network.
+
+    A free function rather than a method: it needs nothing of the service but
+    the client, and that is what makes it testable without one.
+    """
+    resolved: list[BoundValue] = []
+    for item in bound:
+        if item.rule.value_type != ValueType.IMAGE or isinstance(item.value, bytes):
+            resolved.append(item)
+            continue
+        if images is None:
+            # A deployment problem, not a caller's: the template maps an image
+            # and nothing was wired to fetch it. Saying so beats building a
+            # pass with a silent hole where the picture goes.
+            raise ProblemError(
+                500,
+                "image_service_not_configured",
+                "Template maps an image but no image service is configured",
+            )
+        resolved.append(
+            item.model_copy(update={"value": await images.fetch(item.value)})
+        )
+    return resolved
+
+
 class RenderService:
     """Turns (template, person_uid, wallet_type) into a delivered pass."""
 
@@ -140,6 +191,7 @@ class RenderService:
         credentials: CredentialService,
         data_provider: DataProviderClient,
         *,
+        images: SupportsImageFetch | None = None,
         google_api: SupportsGoogleApi | None = None,
         apple_sign: Callable[[object], None] | None = None,
         wwdr_certificate_path: Path = Settings.model_fields[
@@ -147,6 +199,11 @@ class RenderService:
         ].default,
     ) -> None:
         """Bind the service to its collaborators.
+
+        `images` resolves an `IMAGE` mapping rule's reference to bytes on the
+        Apple path. Optional so a test that maps no image needs no fake for
+        it; a template that *does* map one and finds it unset gets a 500
+        rather than a pass with a hole where the picture goes.
 
         `google_api` and `apple_sign` are test-only overrides: `google_api`
         replaces the real `edutap.wallet_google.api` module so unit tests
@@ -165,6 +222,7 @@ class RenderService:
         self._templates = templates
         self._credentials = credentials
         self._data_provider = data_provider
+        self._images = images
         self._google_api: SupportsGoogleApi = google_api or wallet_google_api
         self._apple_sign_override = apple_sign
         self._wwdr_certificate_path = wwdr_certificate_path
@@ -704,6 +762,7 @@ class RenderService:
     ) -> RenderResult:
         """Build the platform payload and deliver it (sign, or push to Google)."""
         if spec.wallet_type in APPLE_WALLET_TYPES:
+            bound = await resolve_image_references(bound, self._images)
             sign = await self._apple_signer(tenant_id, variant.credential_set_id)
             try:
                 pkpass = build_apple(spec, bound, serial_number=pass_id, sign=sign)

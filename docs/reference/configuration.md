@@ -16,6 +16,9 @@ The settings model is `edutap.pass_builder.settings.Settings`.
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL` | string | — | yes |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_TOKEN` | secret string | `""` (unset) | no |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_TIMEOUT` | float, seconds | `10.0` | no |
+| `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_BASE_URL` | string | `http://image_service:8000` | no |
+| `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_TOKEN` | secret string | `""` (unset) | no |
+| `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_TIMEOUT` | float, seconds | `10.0` | no |
 | `EDUTAP_PASS_BUILDER_OBJECTSTORE_ENDPOINT_URL` | string | `http://localhost:9000` | no |
 | `EDUTAP_PASS_BUILDER_OBJECTSTORE_BUCKET` | string | `pass-builder` | no |
 | `EDUTAP_PASS_BUILDER_OBJECTSTORE_ACCESS_KEY` | string | `""` | no |
@@ -114,3 +117,38 @@ The number of months an `audit_log` entry is kept before
 deletion.
 This function is not scheduled by the service itself; an operator must
 invoke it periodically for entries to actually be purged.
+
+## `IMAGE_SERVICE_*`
+
+Where an `IMAGE` mapping rule's reference is resolved.
+
+A rule with `value_type = image` binds a **URL**, not a picture.
+The data provider answers JSON and JSON has no bytes, so the value can only
+travel as a reference.
+
+What happens to it then depends on the platform, and the asymmetry is the
+platforms' rather than ours:
+
+- **Apple** — a `.pkpass` is a bundle and carries the picture as a file inside
+  it, so the reference is fetched from the image service and the bytes go into
+  the bundle.
+- **Google** — an object carries images as URLs and the wallet fetches them
+  itself, so the reference is substituted as it stands.
+  Fetching it would put a copy of a person's photograph somewhere Google never
+  reads.
+
+`IMAGE_SERVICE_BASE_URL` is also a bound: a reference that does not start with
+it is refused with `422 image_reference_rejected` and never fetched.
+The reference arrives from the data provider, which makes it data rather than
+configuration, and a service that fetches whatever URL it is handed reaches
+hosts its caller cannot.
+
+```{note}
+Until 2026-09-01 an `IMAGE` rule could carry nothing at all, and said nothing
+about it: the binder passed an image value through only when it was already
+`bytes`, which a JSON value never is, so the rule bound, the version published
+green and the picture was missing.
+Publishing now rejects a mapping that could not place a picture — an `image`
+value on a non-image target, an image target with another value type, or an
+image target on a Google variant, where no asset bundle exists.
+```

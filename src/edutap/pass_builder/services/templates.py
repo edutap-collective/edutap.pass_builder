@@ -711,6 +711,7 @@ class TemplateService:
             _mapping_rule_to_spec(row) for row in await self._rules_for(version.id)
         ]
         problems.extend(validate_mapping_rules(authored_rules, catalogue))
+        problems.extend(self._check_image_rules(variant, authored_rules))
 
         if variant.wallet_type in APPLE_WALLET_TYPES:
             filenames = {asset.filename for asset in await self.list_assets(version.id)}
@@ -748,6 +749,50 @@ class TemplateService:
                 )
             if version.pass_json is not None:
                 problems.append("google variant must not set pass_json")
+        return problems
+
+    def _check_image_rules(
+        self, variant: TemplateVariant, rules: list[RuleSpec]
+    ) -> list[str]:
+        """Check that every image rule can actually put a picture on the pass.
+
+        Three ways an image rule fails *silently* at render time, which is
+        why all three are publish-time errors instead:
+
+        * **An `image` value type on any other target kind.** The resolved
+          bytes would be written into a text field, a barcode message or an
+          NFC payload as their `str()` representation.
+        * **An `image` target kind with any other value type.** `apply_apple`
+          writes the asset only for bytes, so a text value bound to an image
+          target lands nowhere at all -- no asset, no error.
+        * **An `image` target kind on a Google variant.** A Google object has
+          no asset bundle; it carries images as URLs inside the object JSON,
+          resolved by placeholder from the *source field*, and `apply_google`
+          ignores `target_kind` entirely. Declaring one says the author
+          expected a slot that does not exist on this platform.
+
+        The Google case leaves `value_type = image` legitimate there: the
+        reference is exactly what Google wants, substituted as a string.
+        """
+        problems: list[str] = []
+        google = variant.wallet_type in GOOGLE_WALLET_TYPES
+        for rule in rules:
+            is_image_value = rule.value_type == ValueType.IMAGE
+            is_image_target = rule.target_kind == TargetKind.IMAGE
+            if is_image_target and google:
+                problems.append(
+                    f"image target is not supported on a google variant: "
+                    f"{rule.source_field}"
+                )
+                continue
+            if is_image_value and not is_image_target and not google:
+                problems.append(
+                    f"image value must bind an image target: {rule.source_field}"
+                )
+            if is_image_target and not is_image_value:
+                problems.append(
+                    f"image target requires an image value type: {rule.source_field}"
+                )
         return problems
 
     def _check_apple_mapping_targets(
