@@ -5,6 +5,11 @@ data into a wallet pass: a signed `.pkpass` for Apple Wallet, or a pushed
 object plus a save link for Google Wallet.
 Samsung is reserved but not implemented.
 
+It ships as **two applications out of one image**: the render API four
+services call with a bearer token, and a management interface a person uses.
+They share a database, a service layer and a master key; see
+[Run the management UI](docs/how-to/run-the-management-ui.md).
+
 The service persists templates, variants, versions, mapping rules and
 signing credentials.
 It does not persist issued passes — the calling service owns and stores
@@ -45,6 +50,30 @@ make test-local
 `make test-local` runs the unit and service-level test suite; it spins up
 its own ephemeral PostgreSQL container through `testcontainers` and needs
 only a working Docker daemon, not `docker compose up`.
+
+## The management interface
+
+A React application in front of the same service layer, with its own targets
+so the Python half stays runnable without a Node toolchain:
+
+```console
+make frontend-install
+make frontend-types      # regenerate the typed client from the OpenAPI document
+make lint-frontend
+make test-frontend
+make build-frontend
+```
+
+Run it beside the render API:
+
+```console
+uv run uvicorn edutap.pass_builder.ui.app:create_ui_app --factory --port 8001
+```
+
+Who may use it is an allow-list of principals or groups, taken from the
+headers the web frontend asserts. **Two empty lists deny everyone** — an
+installation nobody has configured must end up unreachable rather than
+standing open in front of signing credentials.
 
 Configuration is read from the environment, prefixed with
 `EDUTAP_PASS_BUILDER_` — see `src/edutap/pass_builder/settings.py` or

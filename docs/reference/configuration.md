@@ -25,6 +25,11 @@ The settings model is `edutap.pass_builder.settings.Settings`.
 | `EDUTAP_PASS_BUILDER_OBJECTSTORE_SECRET_KEY` | secret string | `""` | no |
 | `EDUTAP_PASS_BUILDER_WWDR_CERTIFICATE_PATH` | path | `assets/wwdr-g4.pem` | no |
 | `EDUTAP_PASS_BUILDER_AUDIT_RETENTION_MONTHS` | integer | `24` | no |
+| `EDUTAP_PASS_BUILDER_UI_API_CLASS` | string | `api` | no |
+| `EDUTAP_PASS_BUILDER_UI_REMOTE_USER_HEADER` | string | `REMOTE_USER` | no |
+| `EDUTAP_PASS_BUILDER_UI_GROUPS_HEADER` | string | `isMemberOf` | no |
+| `EDUTAP_PASS_BUILDER_UI_AUTHORISED_USERS` | string, comma separated | `""` | no |
+| `EDUTAP_PASS_BUILDER_UI_AUTHORISED_GROUPS` | string, comma separated | `""` | no |
 
 ## `DB_*`
 
@@ -152,3 +157,26 @@ Publishing now rejects a mapping that could not place a picture — an `image`
 value on a non-image target, an image target with another value type, or an
 image target on a Google variant, where no asset bundle exists.
 ```
+
+## `UI_*`
+
+The management application's own zone and its allow-list — see
+{doc}`/how-to/run-the-management-ui`.
+
+`UI_API_CLASS` defaults to `api`, the zone that means Shibboleth, because the
+UI has people in front of it.
+The render API's `API_CLASS` stays `internal-api` and the two are separate
+settings on purpose: they are separate applications in separate zones.
+
+`UI_AUTHORISED_USERS` and `UI_AUTHORISED_GROUPS` are comma separated, and
+either is enough to let someone in.
+
+```{warning}
+**Two empty lists deny everyone**, which is the same reasoning as the default
+zone: an installation nobody has configured must end up unreachable rather
+than standing open in front of signing credentials.
+```
+
+They are plain strings rather than lists because `pydantic-settings` parses a
+list-typed field as JSON — `a,b` would have to be written `["a","b"]` in an
+environment variable, a shape nobody types correctly twice.
