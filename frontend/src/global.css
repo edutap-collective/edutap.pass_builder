@@ -1,0 +1,87 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  padding: 1.5rem;
+}
+
+main {
+  max-width: 60rem;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin-bottom: 0;
+}
+
+header p {
+  margin-top: 0.25rem;
+  opacity: 0.75;
+}
+
+nav button[aria-pressed="true"],
+.languages button[aria-pressed="true"] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+}
+
+textarea {
+  min-width: 24rem;
+  min-height: 6rem;
+  font-family: ui-monospace, monospace;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgb(128 128 128 / 0.3);
+}
+
+.problem {
+  white-space: pre-line;
+  color: #a11;
+}
+
+.hint {
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.issued-token {
+  border: 1px solid rgb(128 128 128 / 0.5);
+  padding: 0.75rem;
+  margin: 0.75rem 0;
+}
+
+.issued-token code {
+  display: block;
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+  margin: 0.5rem 0;
+}
+
+.variants,
+.versions {
+  margin-left: 1rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid rgb(128 128 128 / 0.3);
+}

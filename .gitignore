@@ -12,3 +12,8 @@ docs/_build/
 uv.lock
 
 .superpowers/
+
+# The management UI's frontend build and its generated artefacts.
+frontend/node_modules/
+frontend/openapi.json
+src/edutap/pass_builder/ui/static/

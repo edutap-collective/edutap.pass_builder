@@ -1,0 +1,77 @@
+{
+  "app": { "title": "eduTAP Pass Builder", "subtitle": "Vorlagen, Mapping-Regeln und Signing-Credentials" },
+  "tenant": {
+    "label": "Mandant",
+    "none": "Noch kein Mandant angelegt",
+    "create": "Mandant anlegen",
+    "key": "Schlüssel",
+    "name": "Name"
+  },
+  "tabs": {
+    "templates": "Vorlagen",
+    "credentials": "Credentials",
+    "clients": "API-Token",
+    "catalogue": "Feldkatalog"
+  },
+  "templates": {
+    "empty": "Keine Vorlagen",
+    "create": "Vorlage anlegen",
+    "key": "Schlüssel",
+    "name": "Name",
+    "variants": "Varianten",
+    "addVariant": "Variante anlegen",
+    "walletType": "Wallet-Typ",
+    "default": "Standard",
+    "versions": "Versionen",
+    "version": "Version",
+    "status": "Status",
+    "publish": "Publizieren",
+    "validate": "Prüfen",
+    "uploadBundle": "pkpasstemplate hochladen",
+    "designerFiles": "Designer-Dateien (class.json, object.json, mappings.json)",
+    "importDesigner": "Aus dem Designer übernehmen",
+    "valid": "Keine Beanstandungen"
+  },
+  "credentials": {
+    "empty": "Keine Credentials",
+    "label": "Bezeichnung",
+    "provider": "Anbieter",
+    "status": "Status",
+    "createApple": "Apple-Schlüssel erzeugen",
+    "commonName": "Common Name",
+    "importApple": "Apple-Zertifikat einspielen",
+    "importGoogle": "Google-Dienstkonto einspielen",
+    "issuerId": "Issuer-ID",
+    "privateKey": "Privater Schlüssel (PEM)",
+    "certificate": "Zertifikat (PEM)",
+    "serviceAccount": "service_account.json",
+    "csr": "CSR herunterladen"
+  },
+  "clients": {
+    "empty": "Keine API-Token",
+    "name": "Dienst",
+    "scopes": "Scopes",
+    "create": "Token anlegen",
+    "revoke": "Widerrufen",
+    "active": "Aktiv",
+    "revoked": "Widerrufen",
+    "tokenOnce": "Dieser Wert wird nur jetzt angezeigt. Gespeichert ist nur sein SHA-256; ein verlorenes Token wird ersetzt, nicht wiederhergestellt."
+  },
+  "catalogue": {
+    "empty": "Katalog ist leer",
+    "refresh": "Vom data_provider neu laden",
+    "download": "catalogue.json herunterladen",
+    "hint": "Denselben Katalog lädt der Pass-Designer. Zwei Dateien hieße: eine im Designer gebaute Regel scheitert erst beim Publizieren.",
+    "key": "Feld",
+    "valueType": "Typ",
+    "labelColumn": "Beschriftung",
+    "required": "Pflicht"
+  },
+  "common": {
+    "loading": "Wird geladen …",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "error": "Fehler",
+    "close": "Schließen"
+  }
+}

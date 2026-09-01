@@ -137,3 +137,21 @@ async def ui_auth_context(
     if exists is None:
         raise ProblemError(404, "tenant_not_found", "Tenant not found")
     return AuthContext(principal=principal.name, tenant_id=tenant_id, scopes=set(Scope))
+
+
+async def tenant_path_parameter(tenant_id: UUID) -> UUID:
+    """Declare `{tenant_id}` so it exists in the OpenAPI document.
+
+    A router mounted under a path template does not by itself put that
+    template's parameter into the schema -- FastAPI documents the parameters
+    an operation *declares*, and none of the reused management endpoints
+    declares this one. Without this dependency the document describes routes
+    whose `{tenant_id}` no generated client can fill, which is exactly the
+    kind of contract error that is invisible until someone generates a client.
+
+    `ui_auth_context` reads the same segment through `request.path_params`
+    rather than through this value: it must resolve the caller even if the
+    dependency order ever changes, and a check that can be reordered away is
+    not a check.
+    """
+    return tenant_id

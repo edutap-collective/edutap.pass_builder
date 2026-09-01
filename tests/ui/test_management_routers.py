@@ -64,7 +64,15 @@ async def test_an_unknown_tenant_is_404_before_the_router_body_runs(ui):
     assert response.json()["type"].endswith("tenant_not_found")
 
 
-async def test_a_malformed_tenant_segment_is_404_not_500(ui):
+async def test_a_malformed_tenant_segment_answers_like_an_unknown_one(ui):
+    """404, the same as a tenant id that simply does not exist.
+
+    Measured rather than assumed: the caller is resolved before the declared
+    `UUID` parameter is coerced, so `ui_auth_context` refuses first. The result
+    is the better property anyway -- a malformed id and an unknown id are
+    indistinguishable from outside, so neither answer says anything about
+    which tenant ids are real.
+    """
     response = await ui.post(
         "/tenants/not-a-uuid/templates",
         json={"key": "esc_id_v1", "name": "European Student Card"},
@@ -107,3 +115,33 @@ def test_the_ui_cannot_render_a_pass(ui_app):
     # render routes leaked in here.
     assert any(path.endswith("/templates") for path in paths), paths
     assert not any(path.endswith("/passes") for path in paths), paths
+
+
+async def test_the_single_page_application_does_not_shadow_the_api(ui, ui_app):
+    """The mount at "/" is added last, and order is what keeps it harmless.
+
+    Starlette matches routes in the order they were added, so a mount at the
+    root added before the routers would swallow every API path. This only
+    exercises anything once the frontend has been built -- `make
+    build-frontend` or the Docker stage -- and is a no-op otherwise, which is
+    deliberate: the Python half must stay runnable without a Node toolchain.
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from edutap.pass_builder.ui.app import STATIC_DIR
+
+    api = await ui.get("/tenants")
+    assert api.status_code == 200
+    assert api.json() == []
+
+    if not STATIC_DIR.is_dir():
+        return
+
+    # The shell itself carries no principal check, and that is right: it is a
+    # bundle of JavaScript, not data. Everything it then asks for goes through
+    # the same allow-list as any other call.
+    transport = ASGITransport(app=ui_app)
+    async with AsyncClient(transport=transport, base_url="http://ui") as client:
+        page = await client.get("/")
+    assert page.status_code == 200
+    assert '<div id="root">' in page.text

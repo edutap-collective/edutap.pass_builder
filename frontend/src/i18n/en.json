@@ -1,0 +1,77 @@
+{
+  "app": { "title": "eduTAP Pass Builder", "subtitle": "Templates, mapping rules and signing credentials" },
+  "tenant": {
+    "label": "Tenant",
+    "none": "No tenant yet",
+    "create": "Create tenant",
+    "key": "Key",
+    "name": "Name"
+  },
+  "tabs": {
+    "templates": "Templates",
+    "credentials": "Credentials",
+    "clients": "API tokens",
+    "catalogue": "Field catalogue"
+  },
+  "templates": {
+    "empty": "No templates",
+    "create": "Create template",
+    "key": "Key",
+    "name": "Name",
+    "variants": "Variants",
+    "addVariant": "Add variant",
+    "walletType": "Wallet type",
+    "default": "Default",
+    "versions": "Versions",
+    "version": "Version",
+    "status": "Status",
+    "publish": "Publish",
+    "validate": "Validate",
+    "uploadBundle": "Upload pkpasstemplate",
+    "designerFiles": "Designer files (class.json, object.json, mappings.json)",
+    "importDesigner": "Import from the designer",
+    "valid": "No findings"
+  },
+  "credentials": {
+    "empty": "No credentials",
+    "label": "Label",
+    "provider": "Provider",
+    "status": "Status",
+    "createApple": "Generate an Apple key",
+    "commonName": "Common name",
+    "importApple": "Import an Apple certificate",
+    "importGoogle": "Import a Google service account",
+    "issuerId": "Issuer id",
+    "privateKey": "Private key (PEM)",
+    "certificate": "Certificate (PEM)",
+    "serviceAccount": "service_account.json",
+    "csr": "Download CSR"
+  },
+  "clients": {
+    "empty": "No API tokens",
+    "name": "Service",
+    "scopes": "Scopes",
+    "create": "Create token",
+    "revoke": "Revoke",
+    "active": "Active",
+    "revoked": "Revoked",
+    "tokenOnce": "Shown this once only. Only its SHA-256 is stored; a lost token is replaced, not recovered."
+  },
+  "catalogue": {
+    "empty": "The catalogue is empty",
+    "refresh": "Reload from the data provider",
+    "download": "Download catalogue.json",
+    "hint": "The pass designer loads this same catalogue. Two files means a rule authored there fails at publish time.",
+    "key": "Field",
+    "valueType": "Type",
+    "labelColumn": "Label",
+    "required": "Required"
+  },
+  "common": {
+    "loading": "Loading …",
+    "save": "Save",
+    "cancel": "Cancel",
+    "error": "Error",
+    "close": "Close"
+  }
+}

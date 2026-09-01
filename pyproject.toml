@@ -78,6 +78,11 @@ schema = "edutap.pass_builder.models.dbdef:definition"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/edutap"]
+# The built single-page application. `.gitignore` keeps it out of the
+# repository -- it is a build product -- and hatchling excludes ignored files
+# by default, so without this line the wheel ships an API with no interface in
+# front of it and nothing says why.
+artifacts = ["src/edutap/pass_builder/ui/static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
