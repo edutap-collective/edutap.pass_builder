@@ -133,10 +133,77 @@ class Settings(BaseSettings):
     not generate any, so it stays unset here.
     """
 
+    # ---- The management UI ----
+    #
+    # A second ASGI application out of the same image, in a different zone and
+    # with a different notion of a caller: `app.py` authenticates an
+    # `api_client` by bearer token, `ui.py` authenticates a person.
+    #
+    # Two applications rather than two routers on one, because `api_class`
+    # above is a single setting for a whole application and the zone is what
+    # keeps `POST /passes` off a publicly reachable entry point. Splitting by
+    # router would make that boundary a label, and a label is the kind of
+    # boundary that falls silently during the next rework.
+
+    ui_api_class: Literal["api", "public-api", "internal-api"] = "api"
+    """Zone the webfe enforces in front of the management UI.
+
+    "api" -- the zone that means Shibboleth -- because the UI has people in
+    front of it and takes its principal from the web frontend.
+    """
+
+    ui_remote_user_header: str = "REMOTE_USER"
+    """Header carrying the authenticated principal, set by the web frontend.
+
+    A header and not an environment variable: the service sits behind the
+    frontend rather than inside it. Configurable because the name is a
+    deployment's choice, and no deployment should have to patch code for it.
+    """
+
+    ui_groups_header: str = "isMemberOf"
+    """Header carrying the principal's group memberships, semicolon separated.
+
+    The eduPerson attribute name Shibboleth uses by default. Absent or empty
+    means no groups, which is not an error -- it is simply someone who is not
+    a member of anything.
+    """
+
+    ui_authorised_users: str = ""
+    """Principals allowed into the UI, comma separated."""
+
+    ui_authorised_groups: str = ""
+    """Groups whose members are allowed into the UI, comma separated."""
+
     @property
     def base_path(self) -> str:
         """Mount point of this service, fed into FastAPI's root_path."""
         return f"/{self.api_class}{self.api_suffix}/{self.api_domain}"
+
+    @property
+    def ui_base_path(self) -> str:
+        """Mount point of the management UI, fed into its own root_path."""
+        return f"/{self.ui_api_class}{self.api_suffix}/{self.api_domain}"
+
+    @property
+    def ui_authorised_user_set(self) -> frozenset[str]:
+        """The allow-listed principals, empty entries dropped."""
+        return _comma_set(self.ui_authorised_users)
+
+    @property
+    def ui_authorised_group_set(self) -> frozenset[str]:
+        """The allow-listed groups, empty entries dropped."""
+        return _comma_set(self.ui_authorised_groups)
+
+
+def _comma_set(raw: str) -> frozenset[str]:
+    """Split a comma separated setting into a set, dropping blanks.
+
+    A plain `str` field rather than a `list[str]`: pydantic-settings parses a
+    list-typed field as JSON, so `a,b` would have to be written `["a","b"]` in
+    an environment variable and in a `.env` -- a shape nobody types correctly
+    twice.
+    """
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
 @lru_cache
