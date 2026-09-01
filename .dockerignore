@@ -1,0 +1,24 @@
+# Build products and caches that must not travel into the build context.
+#
+# `src/edutap/pass_builder/ui/static/` is the one that matters: it is where a
+# local `make build-frontend` writes, and `COPY src ./src` would carry that
+# bundle into the image ALONGSIDE the one the frontend stage builds. The two
+# differ -- the local one is built for base "/" and the image's for the
+# deployment's mount point -- and the result is an image shipping a second,
+# wrong bundle that nothing references and nobody notices.
+src/edutap/pass_builder/ui/static/
+frontend/node_modules/
+frontend/openapi.json
+
+.venv/
+.git/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+__pycache__/
+*.py[cod]
+dist/
+build/
+*.egg-info/
+docs/_build/
+.env
