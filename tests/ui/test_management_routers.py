@@ -67,11 +67,14 @@ async def test_an_unknown_tenant_is_404_before_the_router_body_runs(ui):
 async def test_a_malformed_tenant_segment_answers_like_an_unknown_one(ui):
     """404, the same as a tenant id that simply does not exist.
 
-    Measured rather than assumed: the caller is resolved before the declared
-    `UUID` parameter is coerced, so `ui_auth_context` refuses first. The result
-    is the better property anyway -- a malformed id and an unknown id are
-    indistinguishable from outside, so neither answer says anything about
-    which tenant ids are real.
+    GUARANTEED, NOT MEASURED, and that is the whole point of declaring
+    `tenant_path_parameter` as a `str`: typed as a `UUID` it could reject the
+    segment itself with a `422`, and which of the two answers came back would
+    depend on the order FastAPI happened to solve dependencies in. Parsing
+    lives in `ui_auth_context` alone, so nothing can get in front of it.
+
+    And 404 for both is the property worth having: neither answer says
+    anything about which tenant ids are real.
     """
     response = await ui.post(
         "/tenants/not-a-uuid/templates",

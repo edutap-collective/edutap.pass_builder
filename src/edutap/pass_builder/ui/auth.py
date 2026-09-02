@@ -139,7 +139,7 @@ async def ui_auth_context(
     return AuthContext(principal=principal.name, tenant_id=tenant_id, scopes=set(Scope))
 
 
-async def tenant_path_parameter(tenant_id: UUID) -> UUID:
+async def tenant_path_parameter(tenant_id: str) -> str:
     """Declare `{tenant_id}` so it exists in the OpenAPI document.
 
     A router mounted under a path template does not by itself put that
@@ -149,9 +149,20 @@ async def tenant_path_parameter(tenant_id: UUID) -> UUID:
     whose `{tenant_id}` no generated client can fill, which is exactly the
     kind of contract error that is invisible until someone generates a client.
 
-    `ui_auth_context` reads the same segment through `request.path_params`
-    rather than through this value: it must resolve the caller even if the
-    dependency order ever changes, and a check that can be reordered away is
-    not a check.
+    `str` AND NOT `UUID`, deliberately. Typed as `UUID` this dependency can
+    reject a malformed segment itself, with a `422`, and whether it gets the
+    chance depends on the order FastAPI happens to solve dependencies in. That
+    made the answer to `/tenants/not-a-uuid/...` a measured fact rather than a
+    guaranteed one -- it was `404` today and could become `422` with a FastAPI
+    upgrade, with nothing in this repository noticing.
+
+    Parsing belongs to `ui_auth_context`, which has to do it anyway: it must
+    resolve the caller even if the dependency order changes, and a check that
+    can be reordered away is not a check. Answering `404` for both a malformed
+    and an unknown id is also the property worth having -- neither answer then
+    says anything about which tenant ids are real.
+
+    The cost is that the generated client types the parameter `string` rather
+    than `string($uuid)`. It carries a UUID either way.
     """
     return tenant_id
