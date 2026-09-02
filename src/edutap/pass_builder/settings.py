@@ -64,6 +64,36 @@ class DatabaseSettings(ClusterSettings):
         """Return the DSN for the async driver this service uses."""
         return self.url(ASYNC_DRIVER)
 
+    @property
+    def alembic_url(self) -> str:
+        """The same DSN, escaped for Alembic's `Config.set_main_option`.
+
+        THE DOUBLED PERCENT SIGNS ARE LOAD-BEARING. `set_main_option` writes
+        into a `ConfigParser`, and that reads `%` as interpolation syntax. A
+        multi-host URL carries the node list as repeated
+        `host=<name>%3A<port>` query parameters -- the colons are
+        percent-encoded -- and every one of them looks to `ConfigParser` like a
+        broken `%(name)s`. The run then aborts before touching the database at
+        all:
+
+            ValueError: invalid interpolation syntax in
+            'postgresql+asyncpg://...?host=pg18-...%3A5432&...' at position 119
+
+        It never came up while this service read a single `database_url`: that
+        form has no percent sign. The multi-host URL is the first that does, and
+        this package is the first to combine `ClusterSettings` with an Alembic
+        of its own -- `edutap.image_service` uses the class too, but its tables
+        live in `public` and are migrated by the shared `edutap-dbdef`
+        container.
+
+        A named property rather than a `.replace()` in `env.py`, so the next
+        package copies a thing with a reason attached instead of an idiom, and
+        so a test can hold it. The proper home is `ClusterSettings` itself; that
+        is a change to `edutap.db_definitions` and does not belong in the fix
+        that unblocks a deploy.
+        """
+        return self.async_url.replace("%", "%%")
+
 
 class Settings(BaseSettings):
     """Configuration for the pass builder service."""

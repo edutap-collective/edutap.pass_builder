@@ -34,7 +34,12 @@ if config.config_file_name is not None:
 # alembic.ini. That matters beyond tidiness: a migration run that reached a
 # replica would succeed at connecting and fail at the first DDL, far from its
 # cause -- `target_session_attrs=read-write` is what keeps it on the primary.
-config.set_main_option("sqlalchemy.url", get_database_settings().async_url)
+#
+# `alembic_url`, not `async_url`: the multi-host form carries percent-encoded
+# colons, and `set_main_option` feeds a `ConfigParser` that reads `%` as
+# interpolation. The property says why; `get_main_option` reverses it, so both
+# readers below get the URL back unchanged.
+config.set_main_option("sqlalchemy.url", get_database_settings().alembic_url)
 
 # The package's OWN metadata, not the global `SQLModel.metadata`. Several
 # packages share this database, and the global singleton cannot tell them
