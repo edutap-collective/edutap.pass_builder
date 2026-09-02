@@ -36,7 +36,7 @@ export function Credentials({ tenantId }: { tenantId: string }) {
   const credentials = useQuery({
     queryKey: ["credentials", tenantId],
     queryFn: async () => {
-      const { data, error } = await client.GET("/builder-ui/v1/tenants/{tenant_id}/credentials", {
+      const { data, error } = await client.GET("/api/v1/tenants/{tenant_id}/credentials", {
         params: { path: { tenant_id: tenantId } },
       });
       if (error) throw error;
@@ -46,7 +46,7 @@ export function Credentials({ tenantId }: { tenantId: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data, error } = await client.POST("/builder-ui/v1/tenants/{tenant_id}/credentials", {
+      const { data, error } = await client.POST("/api/v1/tenants/{tenant_id}/credentials", {
         params: { path: { tenant_id: tenantId } },
         body: buildBody({
           mode,

@@ -2,9 +2,9 @@ import createClient from "openapi-fetch";
 
 import type { paths } from "./schema";
 
-export const API_PREFIX = "/builder-ui/v1";
+export const API_PREFIX = "/api/v1";
 /**
- * The router prefix, and it is part of every path this client is given.
+ * The UI's own API segment, under the portal root -- part of every path below.
  *
  * The generated schema carries it -- FastAPI puts a router prefix into the
  * document, and only `root_path` stays out -- so the typed path literals below

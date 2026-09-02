@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/builder-ui/v1/tenants": {
+    "/api/v1/tenants": {
         parameters: {
             query?: never;
             header?: never;
@@ -20,7 +20,7 @@ export interface paths {
          *     per-tenant permission model would be a second authorisation system with
          *     one user in it.
          */
-        get: operations["list_tenants_builder_ui_v1_tenants_get"];
+        get: operations["list_tenants_api_v1_tenants_get"];
         put?: never;
         /**
          * Create Tenant
@@ -30,14 +30,14 @@ export interface paths {
          *     client: `Tenant.key` is unique, and re-creating one is a plausible mistake
          *     rather than a broken request.
          */
-        post: operations["create_tenant_builder_ui_v1_tenants_post"];
+        post: operations["create_tenant_api_v1_tenants_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/audit": {
+    "/api/v1/tenants/{tenant_id}/audit": {
         parameters: {
             query?: never;
             header?: never;
@@ -56,7 +56,7 @@ export interface paths {
          *     for now; cursor-based pagination is a separate follow-up if callers
          *     ever need to page deep, stable result sets.
          */
-        get: operations["list_audit_builder_ui_v1_tenants__tenant_id__audit_get"];
+        get: operations["list_audit_api_v1_tenants__tenant_id__audit_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -65,7 +65,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/clients": {
+    "/api/v1/tenants/{tenant_id}/clients": {
         parameters: {
             query?: never;
             header?: never;
@@ -76,7 +76,7 @@ export interface paths {
          * List Clients
          * @description List a tenant's API clients, without their tokens.
          */
-        get: operations["list_clients_builder_ui_v1_tenants__tenant_id__clients_get"];
+        get: operations["list_clients_api_v1_tenants__tenant_id__clients_get"];
         put?: never;
         /**
          * Create Client
@@ -86,14 +86,14 @@ export interface paths {
          *     compromised service is then revoked on its own, and `audit_log` says which
          *     service rendered. A shared token names the same caller four times.
          */
-        post: operations["create_client_builder_ui_v1_tenants__tenant_id__clients_post"];
+        post: operations["create_client_api_v1_tenants__tenant_id__clients_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/clients/{client_id}/revoke": {
+    "/api/v1/tenants/{tenant_id}/clients/{client_id}/revoke": {
         parameters: {
             query?: never;
             header?: never;
@@ -110,14 +110,14 @@ export interface paths {
          *     that made each request, and a deleted row turns a year of history into
          *     unattributable entries.
          */
-        post: operations["revoke_client_builder_ui_v1_tenants__tenant_id__clients__client_id__revoke_post"];
+        post: operations["revoke_client_api_v1_tenants__tenant_id__clients__client_id__revoke_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/credentials": {
+    "/api/v1/tenants/{tenant_id}/credentials": {
         parameters: {
             query?: never;
             header?: never;
@@ -128,7 +128,7 @@ export interface paths {
          * List Credentials
          * @description List the tenant's credential sets, metadata only.
          */
-        get: operations["list_credentials_builder_ui_v1_tenants__tenant_id__credentials_get"];
+        get: operations["list_credentials_api_v1_tenants__tenant_id__credentials_get"];
         put?: never;
         /**
          * Create Credential
@@ -139,14 +139,14 @@ export interface paths {
          *     `issuer_id` and `service_account_json`. A missing combination is a
          *     `400 invalid_request`.
          */
-        post: operations["create_credential_builder_ui_v1_tenants__tenant_id__credentials_post"];
+        post: operations["create_credential_api_v1_tenants__tenant_id__credentials_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/credentials/{credential_id}": {
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -160,13 +160,13 @@ export interface paths {
          * Revoke Credential
          * @description Mark a credential set `revoked`. Never a hard delete.
          */
-        delete: operations["revoke_credential_builder_ui_v1_tenants__tenant_id__credentials__credential_id__delete"];
+        delete: operations["revoke_credential_api_v1_tenants__tenant_id__credentials__credential_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/credentials/{credential_id}/certificate": {
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/certificate": {
         parameters: {
             query?: never;
             header?: never;
@@ -178,7 +178,7 @@ export interface paths {
          * Install Certificate
          * @description Install the signed certificate, activating a pending Apple credential set.
          */
-        put: operations["install_certificate_builder_ui_v1_tenants__tenant_id__credentials__credential_id__certificate_put"];
+        put: operations["install_certificate_api_v1_tenants__tenant_id__credentials__credential_id__certificate_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -186,7 +186,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/credentials/{credential_id}/csr": {
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/csr": {
         parameters: {
             query?: never;
             header?: never;
@@ -197,7 +197,7 @@ export interface paths {
          * Get Csr
          * @description Return the stored CSR in PEM. The CSR is public, never secret.
          */
-        get: operations["get_csr_builder_ui_v1_tenants__tenant_id__credentials__credential_id__csr_get"];
+        get: operations["get_csr_api_v1_tenants__tenant_id__credentials__credential_id__csr_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -206,7 +206,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/credentials/{credential_id}/renew": {
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/renew": {
         parameters: {
             query?: never;
             header?: never;
@@ -219,14 +219,14 @@ export interface paths {
          * Renew Credential
          * @description Create a successor Apple credential set with a fresh keypair and CSR.
          */
-        post: operations["renew_credential_builder_ui_v1_tenants__tenant_id__credentials__credential_id__renew_post"];
+        post: operations["renew_credential_api_v1_tenants__tenant_id__credentials__credential_id__renew_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/fields": {
+    "/api/v1/tenants/{tenant_id}/fields": {
         parameters: {
             query?: never;
             header?: never;
@@ -237,7 +237,7 @@ export interface paths {
          * List Fields
          * @description Return the cached data_provider field catalogue.
          */
-        get: operations["list_fields_builder_ui_v1_tenants__tenant_id__fields_get"];
+        get: operations["list_fields_api_v1_tenants__tenant_id__fields_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -246,7 +246,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/fields/catalogue.json": {
+    "/api/v1/tenants/{tenant_id}/fields/catalogue.json": {
         parameters: {
             query?: never;
             header?: never;
@@ -268,7 +268,7 @@ export interface paths {
          *     designer draws against has to be the same thing. `POST /fields/refresh` is
          *     what moves both.
          */
-        get: operations["export_catalogue_builder_ui_v1_tenants__tenant_id__fields_catalogue_json_get"];
+        get: operations["export_catalogue_api_v1_tenants__tenant_id__fields_catalogue_json_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -277,7 +277,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/fields/refresh": {
+    "/api/v1/tenants/{tenant_id}/fields/refresh": {
         parameters: {
             query?: never;
             header?: never;
@@ -290,14 +290,14 @@ export interface paths {
          * Refresh Fields
          * @description Replace the cached catalogue from `data_provider` and return it.
          */
-        post: operations["refresh_fields_builder_ui_v1_tenants__tenant_id__fields_refresh_post"];
+        post: operations["refresh_fields_api_v1_tenants__tenant_id__fields_refresh_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/templates": {
+    "/api/v1/tenants/{tenant_id}/templates": {
         parameters: {
             query?: never;
             header?: never;
@@ -308,20 +308,20 @@ export interface paths {
          * List Templates
          * @description List every template of the tenant.
          */
-        get: operations["list_templates_builder_ui_v1_tenants__tenant_id__templates_get"];
+        get: operations["list_templates_api_v1_tenants__tenant_id__templates_get"];
         put?: never;
         /**
          * Create Template
          * @description Create a new template.
          */
-        post: operations["create_template_builder_ui_v1_tenants__tenant_id__templates_post"];
+        post: operations["create_template_api_v1_tenants__tenant_id__templates_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/templates/{template_id}": {
+    "/api/v1/tenants/{tenant_id}/templates/{template_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -332,24 +332,24 @@ export interface paths {
          * Get Template
          * @description Return one template.
          */
-        get: operations["get_template_builder_ui_v1_tenants__tenant_id__templates__template_id__get"];
+        get: operations["get_template_api_v1_tenants__tenant_id__templates__template_id__get"];
         put?: never;
         post?: never;
         /**
          * Archive Template
          * @description Archive a template. Never a hard delete.
          */
-        delete: operations["archive_template_builder_ui_v1_tenants__tenant_id__templates__template_id__delete"];
+        delete: operations["archive_template_api_v1_tenants__tenant_id__templates__template_id__delete"];
         options?: never;
         head?: never;
         /**
          * Update Template
          * @description Patch a template's name or description.
          */
-        patch: operations["update_template_builder_ui_v1_tenants__tenant_id__templates__template_id__patch"];
+        patch: operations["update_template_api_v1_tenants__tenant_id__templates__template_id__patch"];
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/templates/{template_id}/variants": {
+    "/api/v1/tenants/{tenant_id}/templates/{template_id}/variants": {
         parameters: {
             query?: never;
             header?: never;
@@ -360,20 +360,20 @@ export interface paths {
          * List Variants
          * @description List every variant of a template.
          */
-        get: operations["list_variants_builder_ui_v1_tenants__tenant_id__templates__template_id__variants_get"];
+        get: operations["list_variants_api_v1_tenants__tenant_id__templates__template_id__variants_get"];
         put?: never;
         /**
          * Create Variant
          * @description Create a new variant under a template.
          */
-        post: operations["create_variant_builder_ui_v1_tenants__tenant_id__templates__template_id__variants_post"];
+        post: operations["create_variant_api_v1_tenants__tenant_id__templates__template_id__variants_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/variants/{variant_id}": {
+    "/api/v1/tenants/{tenant_id}/variants/{variant_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -384,7 +384,7 @@ export interface paths {
          * Get Variant
          * @description Return one variant.
          */
-        get: operations["get_variant_builder_ui_v1_tenants__tenant_id__variants__variant_id__get"];
+        get: operations["get_variant_api_v1_tenants__tenant_id__variants__variant_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -394,10 +394,10 @@ export interface paths {
          * Update Variant
          * @description Patch a variant, including `is_default` and `credential_set_id`.
          */
-        patch: operations["update_variant_builder_ui_v1_tenants__tenant_id__variants__variant_id__patch"];
+        patch: operations["update_variant_api_v1_tenants__tenant_id__variants__variant_id__patch"];
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/variants/{variant_id}/sync": {
+    "/api/v1/tenants/{tenant_id}/variants/{variant_id}/sync": {
         parameters: {
             query?: never;
             header?: never;
@@ -415,14 +415,14 @@ export interface paths {
          *     decrypting a credential set, since credentials only need to be decrypted
          *     once it is known a Google push is actually going to happen.
          */
-        post: operations["sync_variant_builder_ui_v1_tenants__tenant_id__variants__variant_id__sync_post"];
+        post: operations["sync_variant_api_v1_tenants__tenant_id__variants__variant_id__sync_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/variants/{variant_id}/versions": {
+    "/api/v1/tenants/{tenant_id}/variants/{variant_id}/versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -433,7 +433,7 @@ export interface paths {
          * List Versions
          * @description List every version of a variant.
          */
-        get: operations["list_versions_builder_ui_v1_tenants__tenant_id__variants__variant_id__versions_get"];
+        get: operations["list_versions_api_v1_tenants__tenant_id__variants__variant_id__versions_get"];
         put?: never;
         /**
          * Create Version
@@ -444,14 +444,14 @@ export interface paths {
          *     content type decides which path runs, since the two platforms need
          *     structurally different payloads.
          */
-        post: operations["create_version_builder_ui_v1_tenants__tenant_id__variants__variant_id__versions_post"];
+        post: operations["create_version_api_v1_tenants__tenant_id__variants__variant_id__versions_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}": {
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -462,7 +462,7 @@ export interface paths {
          * Get Version
          * @description Return one version.
          */
-        get: operations["get_version_builder_ui_v1_tenants__tenant_id__versions__version_id__get"];
+        get: operations["get_version_api_v1_tenants__tenant_id__versions__version_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -471,7 +471,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}/assets/{filename}": {
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}/assets/{filename}": {
         parameters: {
             query?: never;
             header?: never;
@@ -482,24 +482,24 @@ export interface paths {
          * Get Asset
          * @description Return one version's asset bytes.
          */
-        get: operations["get_asset_builder_ui_v1_tenants__tenant_id__versions__version_id__assets__filename__get"];
+        get: operations["get_asset_api_v1_tenants__tenant_id__versions__version_id__assets__filename__get"];
         /**
          * Put Asset
          * @description Replace one draft version's asset. `409` once the version is published.
          */
-        put: operations["put_asset_builder_ui_v1_tenants__tenant_id__versions__version_id__assets__filename__put"];
+        put: operations["put_asset_api_v1_tenants__tenant_id__versions__version_id__assets__filename__put"];
         post?: never;
         /**
          * Delete Asset
          * @description Remove one draft version's asset. `409` once the version is published.
          */
-        delete: operations["delete_asset_builder_ui_v1_tenants__tenant_id__versions__version_id__assets__filename__delete"];
+        delete: operations["delete_asset_api_v1_tenants__tenant_id__versions__version_id__assets__filename__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}/mappings": {
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}/mappings": {
         parameters: {
             query?: never;
             header?: never;
@@ -510,12 +510,12 @@ export interface paths {
          * Get Mappings
          * @description Return a version's mapping rules.
          */
-        get: operations["get_mappings_builder_ui_v1_tenants__tenant_id__versions__version_id__mappings_get"];
+        get: operations["get_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_get"];
         /**
          * Set Mappings
          * @description Bulk replace a draft version's mapping rules. `409` once published.
          */
-        put: operations["set_mappings_builder_ui_v1_tenants__tenant_id__versions__version_id__mappings_put"];
+        put: operations["set_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -523,7 +523,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}/publish": {
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}/publish": {
         parameters: {
             query?: never;
             header?: never;
@@ -536,14 +536,14 @@ export interface paths {
          * Publish Version
          * @description Validate then publish a draft version, archiving its predecessor.
          */
-        post: operations["publish_version_builder_ui_v1_tenants__tenant_id__versions__version_id__publish_post"];
+        post: operations["publish_version_api_v1_tenants__tenant_id__versions__version_id__publish_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}/validate": {
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}/validate": {
         parameters: {
             query?: never;
             header?: never;
@@ -556,7 +556,7 @@ export interface paths {
          * Validate Version
          * @description Run full publish-time validation without publishing.
          */
-        post: operations["validate_version_builder_ui_v1_tenants__tenant_id__versions__version_id__validate_post"];
+        post: operations["validate_version_api_v1_tenants__tenant_id__versions__version_id__validate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1108,7 +1108,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    list_tenants_builder_ui_v1_tenants_get: {
+    list_tenants_api_v1_tenants_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1128,7 +1128,7 @@ export interface operations {
             };
         };
     };
-    create_tenant_builder_ui_v1_tenants_post: {
+    create_tenant_api_v1_tenants_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1161,7 +1161,7 @@ export interface operations {
             };
         };
     };
-    list_audit_builder_ui_v1_tenants__tenant_id__audit_get: {
+    list_audit_api_v1_tenants__tenant_id__audit_get: {
         parameters: {
             query?: {
                 from_?: string | null;
@@ -1200,7 +1200,7 @@ export interface operations {
             };
         };
     };
-    list_clients_builder_ui_v1_tenants__tenant_id__clients_get: {
+    list_clients_api_v1_tenants__tenant_id__clients_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1231,7 +1231,7 @@ export interface operations {
             };
         };
     };
-    create_client_builder_ui_v1_tenants__tenant_id__clients_post: {
+    create_client_api_v1_tenants__tenant_id__clients_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1266,7 +1266,7 @@ export interface operations {
             };
         };
     };
-    revoke_client_builder_ui_v1_tenants__tenant_id__clients__client_id__revoke_post: {
+    revoke_client_api_v1_tenants__tenant_id__clients__client_id__revoke_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1296,7 +1296,7 @@ export interface operations {
             };
         };
     };
-    list_credentials_builder_ui_v1_tenants__tenant_id__credentials_get: {
+    list_credentials_api_v1_tenants__tenant_id__credentials_get: {
         parameters: {
             query?: {
                 provider?: components["schemas"]["Provider"] | null;
@@ -1330,7 +1330,7 @@ export interface operations {
             };
         };
     };
-    create_credential_builder_ui_v1_tenants__tenant_id__credentials_post: {
+    create_credential_api_v1_tenants__tenant_id__credentials_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1365,7 +1365,7 @@ export interface operations {
             };
         };
     };
-    revoke_credential_builder_ui_v1_tenants__tenant_id__credentials__credential_id__delete: {
+    revoke_credential_api_v1_tenants__tenant_id__credentials__credential_id__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -1395,7 +1395,7 @@ export interface operations {
             };
         };
     };
-    install_certificate_builder_ui_v1_tenants__tenant_id__credentials__credential_id__certificate_put: {
+    install_certificate_api_v1_tenants__tenant_id__credentials__credential_id__certificate_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -1431,7 +1431,7 @@ export interface operations {
             };
         };
     };
-    get_csr_builder_ui_v1_tenants__tenant_id__credentials__credential_id__csr_get: {
+    get_csr_api_v1_tenants__tenant_id__credentials__credential_id__csr_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1463,7 +1463,7 @@ export interface operations {
             };
         };
     };
-    renew_credential_builder_ui_v1_tenants__tenant_id__credentials__credential_id__renew_post: {
+    renew_credential_api_v1_tenants__tenant_id__credentials__credential_id__renew_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1495,7 +1495,7 @@ export interface operations {
             };
         };
     };
-    list_fields_builder_ui_v1_tenants__tenant_id__fields_get: {
+    list_fields_api_v1_tenants__tenant_id__fields_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1526,7 +1526,7 @@ export interface operations {
             };
         };
     };
-    export_catalogue_builder_ui_v1_tenants__tenant_id__fields_catalogue_json_get: {
+    export_catalogue_api_v1_tenants__tenant_id__fields_catalogue_json_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1557,7 +1557,7 @@ export interface operations {
             };
         };
     };
-    refresh_fields_builder_ui_v1_tenants__tenant_id__fields_refresh_post: {
+    refresh_fields_api_v1_tenants__tenant_id__fields_refresh_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1588,7 +1588,7 @@ export interface operations {
             };
         };
     };
-    list_templates_builder_ui_v1_tenants__tenant_id__templates_get: {
+    list_templates_api_v1_tenants__tenant_id__templates_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1619,7 +1619,7 @@ export interface operations {
             };
         };
     };
-    create_template_builder_ui_v1_tenants__tenant_id__templates_post: {
+    create_template_api_v1_tenants__tenant_id__templates_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1654,7 +1654,7 @@ export interface operations {
             };
         };
     };
-    get_template_builder_ui_v1_tenants__tenant_id__templates__template_id__get: {
+    get_template_api_v1_tenants__tenant_id__templates__template_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1686,7 +1686,7 @@ export interface operations {
             };
         };
     };
-    archive_template_builder_ui_v1_tenants__tenant_id__templates__template_id__delete: {
+    archive_template_api_v1_tenants__tenant_id__templates__template_id__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -1718,7 +1718,7 @@ export interface operations {
             };
         };
     };
-    update_template_builder_ui_v1_tenants__tenant_id__templates__template_id__patch: {
+    update_template_api_v1_tenants__tenant_id__templates__template_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -1754,7 +1754,7 @@ export interface operations {
             };
         };
     };
-    list_variants_builder_ui_v1_tenants__tenant_id__templates__template_id__variants_get: {
+    list_variants_api_v1_tenants__tenant_id__templates__template_id__variants_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1786,7 +1786,7 @@ export interface operations {
             };
         };
     };
-    create_variant_builder_ui_v1_tenants__tenant_id__templates__template_id__variants_post: {
+    create_variant_api_v1_tenants__tenant_id__templates__template_id__variants_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1822,7 +1822,7 @@ export interface operations {
             };
         };
     };
-    get_variant_builder_ui_v1_tenants__tenant_id__variants__variant_id__get: {
+    get_variant_api_v1_tenants__tenant_id__variants__variant_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1854,7 +1854,7 @@ export interface operations {
             };
         };
     };
-    update_variant_builder_ui_v1_tenants__tenant_id__variants__variant_id__patch: {
+    update_variant_api_v1_tenants__tenant_id__variants__variant_id__patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -1890,7 +1890,7 @@ export interface operations {
             };
         };
     };
-    sync_variant_builder_ui_v1_tenants__tenant_id__variants__variant_id__sync_post: {
+    sync_variant_api_v1_tenants__tenant_id__variants__variant_id__sync_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1924,7 +1924,7 @@ export interface operations {
             };
         };
     };
-    list_versions_builder_ui_v1_tenants__tenant_id__variants__variant_id__versions_get: {
+    list_versions_api_v1_tenants__tenant_id__variants__variant_id__versions_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1956,7 +1956,7 @@ export interface operations {
             };
         };
     };
-    create_version_builder_ui_v1_tenants__tenant_id__variants__variant_id__versions_post: {
+    create_version_api_v1_tenants__tenant_id__variants__variant_id__versions_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1988,7 +1988,7 @@ export interface operations {
             };
         };
     };
-    get_version_builder_ui_v1_tenants__tenant_id__versions__version_id__get: {
+    get_version_api_v1_tenants__tenant_id__versions__version_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2020,7 +2020,7 @@ export interface operations {
             };
         };
     };
-    get_asset_builder_ui_v1_tenants__tenant_id__versions__version_id__assets__filename__get: {
+    get_asset_api_v1_tenants__tenant_id__versions__version_id__assets__filename__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2053,7 +2053,7 @@ export interface operations {
             };
         };
     };
-    put_asset_builder_ui_v1_tenants__tenant_id__versions__version_id__assets__filename__put: {
+    put_asset_api_v1_tenants__tenant_id__versions__version_id__assets__filename__put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2086,7 +2086,7 @@ export interface operations {
             };
         };
     };
-    delete_asset_builder_ui_v1_tenants__tenant_id__versions__version_id__assets__filename__delete: {
+    delete_asset_api_v1_tenants__tenant_id__versions__version_id__assets__filename__delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -2117,7 +2117,7 @@ export interface operations {
             };
         };
     };
-    get_mappings_builder_ui_v1_tenants__tenant_id__versions__version_id__mappings_get: {
+    get_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -2149,7 +2149,7 @@ export interface operations {
             };
         };
     };
-    set_mappings_builder_ui_v1_tenants__tenant_id__versions__version_id__mappings_put: {
+    set_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2185,7 +2185,7 @@ export interface operations {
             };
         };
     };
-    publish_version_builder_ui_v1_tenants__tenant_id__versions__version_id__publish_post: {
+    publish_version_api_v1_tenants__tenant_id__versions__version_id__publish_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2217,7 +2217,7 @@ export interface operations {
             };
         };
     };
-    validate_version_builder_ui_v1_tenants__tenant_id__versions__version_id__validate_post: {
+    validate_version_api_v1_tenants__tenant_id__versions__version_id__validate_post: {
         parameters: {
             query?: never;
             header?: never;

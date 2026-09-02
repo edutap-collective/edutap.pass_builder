@@ -29,7 +29,7 @@ export function ApiClients({ tenantId }: { tenantId: string }) {
   const clients = useQuery({
     queryKey: ["clients", tenantId],
     queryFn: async () => {
-      const { data, error } = await client.GET("/builder-ui/v1/tenants/{tenant_id}/clients", {
+      const { data, error } = await client.GET("/api/v1/tenants/{tenant_id}/clients", {
         params: { path: { tenant_id: tenantId } },
       });
       if (error) throw error;
@@ -39,7 +39,7 @@ export function ApiClients({ tenantId }: { tenantId: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data, error } = await client.POST("/builder-ui/v1/tenants/{tenant_id}/clients", {
+      const { data, error } = await client.POST("/api/v1/tenants/{tenant_id}/clients", {
         params: { path: { tenant_id: tenantId } },
         body: { name, scopes: ["render"] },
       });
@@ -56,7 +56,7 @@ export function ApiClients({ tenantId }: { tenantId: string }) {
   const revoke = useMutation({
     mutationFn: async (clientId: string) => {
       const { error } = await client.POST(
-        "/builder-ui/v1/tenants/{tenant_id}/clients/{client_id}/revoke",
+        "/api/v1/tenants/{tenant_id}/clients/{client_id}/revoke",
         { params: { path: { tenant_id: tenantId, client_id: clientId } } },
       );
       if (error) throw error;

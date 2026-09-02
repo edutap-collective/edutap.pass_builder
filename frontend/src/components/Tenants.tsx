@@ -10,7 +10,7 @@ export function useTenants() {
   return useQuery({
     queryKey: ["tenants"],
     queryFn: async () => {
-      const { data, error } = await client.GET("/builder-ui/v1/tenants", {});
+      const { data, error } = await client.GET("/api/v1/tenants", {});
       if (error) throw error;
       return (data ?? []) as Tenant[];
     },
@@ -39,7 +39,7 @@ export function Tenants({
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data, error } = await client.POST("/builder-ui/v1/tenants", {
+      const { data, error } = await client.POST("/api/v1/tenants", {
         body: { key, name },
       });
       if (error) throw error;

@@ -40,8 +40,12 @@ a developer working on the Python half should not need a Node toolchain to run
 it. `make build-frontend` fills it; the Docker build does it in its own stage.
 """
 
-UI_PREFIX = "/builder-ui/v1"
-"""The UI's path inside its zone.
+UI_PREFIX = "/api/v1"
+"""The UI's own API, under its portal root.
+
+`/api` here is a segment *inside* `/portale/edutap-pass-builder`, not the
+estate's `/api/<domain>/<service>/v<n>` namespace -- same shape as the pass
+designer, which serves its editor from its portal root and its API beneath it.
 
 Its own segment rather than the render API's `/builder/v1`: the two are
 different contracts with different callers, and a generated client for one
@@ -68,7 +72,7 @@ def create_ui_app() -> FastAPI:
     app = FastAPI(
         title="eduTAP pass builder — management",
         version="0.1.0",
-        root_path=settings.ui_base_path,
+        root_path=settings.ui_root_path,
         docs_url=f"{UI_PREFIX}/docs",
         openapi_url=f"{UI_PREFIX}/openapi.json",
         redoc_url=f"{UI_PREFIX}/redoc",

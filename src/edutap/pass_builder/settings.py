@@ -135,21 +135,32 @@ class Settings(BaseSettings):
 
     # ---- The management UI ----
     #
-    # A second ASGI application out of the same image, in a different zone and
-    # with a different notion of a caller: `app.py` authenticates an
+    # A second ASGI application out of the same image, at a different mount
+    # point and with a different notion of a caller: `app.py` authenticates an
     # `api_client` by bearer token, `ui.py` authenticates a person.
     #
     # Two applications rather than two routers on one, because `api_class`
-    # above is a single setting for a whole application and the zone is what
-    # keeps `POST /passes` off a publicly reachable entry point. Splitting by
-    # router would make that boundary a label, and a label is the kind of
-    # boundary that falls silently during the next rework.
+    # above is a single setting for a whole application and it is what keeps
+    # `POST /passes` off a publicly reachable entry point. Splitting by router
+    # would make that boundary a label, and a label is the kind of boundary
+    # that falls silently during the next rework.
 
-    ui_api_class: Literal["api", "public-api", "internal-api"] = "api"
-    """Zone the webfe enforces in front of the management UI.
+    ui_root_path: str = "/portale/edutap-pass-builder"
+    """Where the management UI is mounted, in full.
 
-    "api" -- the zone that means Shibboleth -- because the UI has people in
-    front of it and takes its principal from the web frontend.
+    A PORTAL, NOT AN API. `/api/<domain>/<service>/v<n>` is the namespace for
+    REST backends that another program calls; this is an interface a person
+    opens, and those live under `/portale/<name>` beside the pass designer,
+    the Kafka UI and CloudBeaver.
+
+    The distinction is not cosmetic. A single-page application owns a whole
+    subtree -- its assets are fetched from `<root>/assets/...` -- and under
+    `/api/wallet` it would squat on the prefix `image-tools` and `admin`
+    share, needing a web-frontend rule of its own just for `assets`. Under a
+    portal path one rule covers the page, its assets and its API.
+
+    Not composed from `api_class`/`api_domain` like `base_path`: those spell
+    the REST convention, and this is not one.
     """
 
     ui_remote_user_header: str = "REMOTE_USER"
@@ -178,11 +189,6 @@ class Settings(BaseSettings):
     def base_path(self) -> str:
         """Mount point of this service, fed into FastAPI's root_path."""
         return f"/{self.api_class}{self.api_suffix}/{self.api_domain}"
-
-    @property
-    def ui_base_path(self) -> str:
-        """Mount point of the management UI, fed into its own root_path."""
-        return f"/{self.ui_api_class}{self.api_suffix}/{self.api_domain}"
 
     @property
     def ui_authorised_user_set(self) -> frozenset[str]:
