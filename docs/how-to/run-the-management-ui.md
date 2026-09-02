@@ -11,10 +11,23 @@ who is in front of them and which zone they sit in.
 ## Why two applications rather than one
 
 `EDUTAP_PASS_BUILDER_API_CLASS` is a single setting for a whole application,
-and the zone is what keeps `POST /passes` off a publicly reachable entry
-point.
+and it is what keeps `POST /passes` off a publicly reachable entry point.
 Separating by router instead would make that boundary a label, and a label is
 the kind of boundary that falls silently during the next rework.
+
+## Why a portal path and not an API one
+
+`/api/<domain>/<service>/v<n>` is the namespace for REST backends another
+program calls.
+This is an interface a person opens, so it lives under `/portale/<name>`,
+beside the pass designer, the Kafka UI and CloudBeaver.
+
+That is not cosmetic.
+A single-page application owns a whole subtree — its bundle is fetched from
+`<root>/assets/…` — and under `/api/wallet` it would squat on the prefix
+`image-tools` and `admin` share, needing a web-frontend rule of its own just
+for `assets`.
+One portal path, one rule, covering the page, its assets and its API.
 
 The UI mounts the management routers themselves — `templates`, `credentials`,
 `fields` and `audit` — under `/tenants/{tenant_id}`, and overrides the one
@@ -27,7 +40,7 @@ The UI takes its principal from the web frontend, and authorises by name or by
 group.
 
 ```text
-EDUTAP_PASS_BUILDER_UI_API_CLASS=api
+EDUTAP_PASS_BUILDER_UI_ROOT_PATH=/portale/edutap-pass-builder
 EDUTAP_PASS_BUILDER_UI_AUTHORISED_USERS=alexander@example.org
 EDUTAP_PASS_BUILDER_UI_AUTHORISED_GROUPS=wallet-admins
 ```
@@ -66,7 +79,7 @@ For a local look, send the headers yourself:
 
 ```shell
 curl -H "REMOTE_USER: alexander@example.org" \
-  http://localhost:8001/builder-ui/v1/tenants
+  http://localhost:8001/api/v1/tenants
 ```
 
 ## Build the interface
@@ -90,11 +103,10 @@ reports every call site a changed route or response model invalidated.
 ```{important}
 **The mount point is baked into the bundle.**
 Vite writes `base` into every asset URL at build time, so the value passed to
-the build must match what `Settings.ui_base_path` computes at run time
-(`UI_API_CLASS` + `API_SUFFIX` + `API_DOMAIN`).
-If the two drift, the page loads, fetches its own assets from the root, and
-shows a white screen that no log explains.
-The Docker build takes it as `EDUTAP_PASS_BUILDER_UI_BASE_PATH`.
+the build must match `Settings.ui_root_path` at run time.
+If the two drift, the page loads, fetches its own assets from somewhere else,
+and shows a white screen that no log explains.
+The Docker build takes it as `EDUTAP_PASS_BUILDER_UI_ROOT_PATH`.
 ```
 
 ## What the interface does

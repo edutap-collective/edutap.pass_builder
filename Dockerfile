@@ -11,11 +11,17 @@ RUN pnpm install --frozen-lockfile
 COPY frontend/ ./
 # THE MOUNT POINT IS BAKED IN AT BUILD TIME. Vite writes `base` into every
 # asset URL, so this has to be the same value the deployment configures as
-# `Settings.ui_base_path` (EDUTAP_PASS_BUILDER_UI_API_CLASS + _API_SUFFIX +
-# _API_DOMAIN). If the two drift, the page loads and then fetches its own
-# assets from the root: a white screen, and nothing in any log says why.
-ARG EDUTAP_PASS_BUILDER_UI_BASE_PATH=/api/wallet
-ENV EDUTAP_PASS_BUILDER_UI_BASE_PATH=${EDUTAP_PASS_BUILDER_UI_BASE_PATH}
+# `Settings.ui_root_path`. If the two drift, the page loads and then fetches
+# its own assets from somewhere else: a white screen, and nothing in any log
+# says why.
+#
+# A PORTAL PATH. This is an interface a person opens, not a REST backend
+# another program calls -- it belongs beside the pass designer under
+# `/portale/`, not in the `/api/<domain>/<service>/v<n>` namespace. Under the
+# latter the bundle would fetch `/api/wallet/assets/...` and squat on a prefix
+# two other services share.
+ARG EDUTAP_PASS_BUILDER_UI_ROOT_PATH=/portale/edutap-pass-builder
+ENV EDUTAP_PASS_BUILDER_UI_ROOT_PATH=${EDUTAP_PASS_BUILDER_UI_ROOT_PATH}
 RUN pnpm build
 
 FROM python:3.14-slim AS build

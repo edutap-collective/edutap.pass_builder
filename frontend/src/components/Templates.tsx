@@ -26,7 +26,7 @@ export function Templates({ tenantId }: { tenantId: string }) {
   const templates = useQuery({
     queryKey: ["templates", tenantId],
     queryFn: async () => {
-      const { data, error } = await client.GET("/builder-ui/v1/tenants/{tenant_id}/templates", {
+      const { data, error } = await client.GET("/api/v1/tenants/{tenant_id}/templates", {
         params: { path: { tenant_id: tenantId } },
       });
       if (error) throw error;
@@ -36,7 +36,7 @@ export function Templates({ tenantId }: { tenantId: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data, error } = await client.POST("/builder-ui/v1/tenants/{tenant_id}/templates", {
+      const { data, error } = await client.POST("/api/v1/tenants/{tenant_id}/templates", {
         params: { path: { tenant_id: tenantId } },
         body: { key, name },
       });
@@ -133,7 +133,7 @@ function Variants({
     queryKey: ["variants", templateId],
     queryFn: async () => {
       const { data, error } = await client.GET(
-        "/builder-ui/v1/tenants/{tenant_id}/templates/{template_id}/variants",
+        "/api/v1/tenants/{tenant_id}/templates/{template_id}/variants",
         { params: { path: { tenant_id: tenantId, template_id: templateId } } },
       );
       if (error) throw error;
@@ -144,7 +144,7 @@ function Variants({
   const create = useMutation({
     mutationFn: async () => {
       const { error } = await client.POST(
-        "/builder-ui/v1/tenants/{tenant_id}/templates/{template_id}/variants",
+        "/api/v1/tenants/{tenant_id}/templates/{template_id}/variants",
         {
           params: { path: { tenant_id: tenantId, template_id: templateId } },
           body: {
@@ -219,7 +219,7 @@ function Versions({ tenantId, variant }: { tenantId: string; variant: Variant })
     queryKey: ["versions", variant.id],
     queryFn: async () => {
       const { data, error } = await client.GET(
-        "/builder-ui/v1/tenants/{tenant_id}/variants/{variant_id}/versions",
+        "/api/v1/tenants/{tenant_id}/variants/{variant_id}/versions",
         { params: { path: { tenant_id: tenantId, variant_id: variant.id } } },
       );
       if (error) throw error;
@@ -233,7 +233,7 @@ function Versions({ tenantId, variant }: { tenantId: string; variant: Variant })
   const publish = useMutation({
     mutationFn: async (versionId: string) => {
       const { error } = await client.POST(
-        "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}/publish",
+        "/api/v1/tenants/{tenant_id}/versions/{version_id}/publish",
         { params: { path: { tenant_id: tenantId, version_id: versionId } } },
       );
       if (error) throw error;
@@ -244,7 +244,7 @@ function Versions({ tenantId, variant }: { tenantId: string; variant: Variant })
   const validate = useMutation({
     mutationFn: async (versionId: string) => {
       const { data, error } = await client.POST(
-        "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}/validate",
+        "/api/v1/tenants/{tenant_id}/versions/{version_id}/validate",
         { params: { path: { tenant_id: tenantId, version_id: versionId } } },
       );
       if (error) throw error;
@@ -317,7 +317,7 @@ function VersionUpload({
     const body = new FormData();
     body.append("file", file);
     const { error: failure } = await client.POST(
-      "/builder-ui/v1/tenants/{tenant_id}/variants/{variant_id}/versions",
+      "/api/v1/tenants/{tenant_id}/variants/{variant_id}/versions",
       {
         params: { path: { tenant_id: tenantId, variant_id: variant.id } },
         // `body` is a FormData: the endpoint reads the content type to decide
@@ -335,7 +335,7 @@ function VersionUpload({
     try {
       const trio = await readDesignerTrio(files);
       const { data, error: created } = await client.POST(
-        "/builder-ui/v1/tenants/{tenant_id}/variants/{variant_id}/versions",
+        "/api/v1/tenants/{tenant_id}/variants/{variant_id}/versions",
         {
           params: { path: { tenant_id: tenantId, variant_id: variant.id } },
           // The endpoint reads its body off the request rather than
@@ -352,7 +352,7 @@ function VersionUpload({
       const versionId = (data as { id: string }).id;
       if (trio.rules) {
         const { error: bound } = await client.PUT(
-          "/builder-ui/v1/tenants/{tenant_id}/versions/{version_id}/mappings",
+          "/api/v1/tenants/{tenant_id}/versions/{version_id}/mappings",
           {
             params: { path: { tenant_id: tenantId, version_id: versionId } },
             body: { rules: trio.rules },

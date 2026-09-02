@@ -25,7 +25,7 @@ export function Catalogue({ tenantId }: { tenantId: string }) {
   const fields = useQuery({
     queryKey: ["fields", tenantId],
     queryFn: async () => {
-      const { data, error } = await client.GET("/builder-ui/v1/tenants/{tenant_id}/fields", {
+      const { data, error } = await client.GET("/api/v1/tenants/{tenant_id}/fields", {
         params: { path: { tenant_id: tenantId } },
       });
       if (error) throw error;
@@ -35,7 +35,7 @@ export function Catalogue({ tenantId }: { tenantId: string }) {
 
   const refresh = useMutation({
     mutationFn: async () => {
-      const { error } = await client.POST("/builder-ui/v1/tenants/{tenant_id}/fields/refresh", {
+      const { error } = await client.POST("/api/v1/tenants/{tenant_id}/fields/refresh", {
         params: { path: { tenant_id: tenantId } },
       });
       if (error) throw error;
