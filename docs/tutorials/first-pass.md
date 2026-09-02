@@ -45,7 +45,10 @@ python3 -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"
 ```
 
 ```text
-EDUTAP_PASS_BUILDER_DATABASE_URL=postgresql+asyncpg://pass_builder:pass_builder@localhost/pass_builder
+EDUTAP_PASS_BUILDER_DB_HOSTS=localhost
+EDUTAP_PASS_BUILDER_DB_DATABASE=pass_builder
+EDUTAP_PASS_BUILDER_DB_USER=pass_builder
+EDUTAP_PASS_BUILDER_DB_PASSWORD=pass_builder
 EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY=<paste the key you just generated>
 EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL=http://localhost:9999
 EDUTAP_PASS_BUILDER_OBJECTSTORE_ENDPOINT_URL=http://localhost:9000
@@ -86,11 +89,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from edutap.pass_builder.auth import hash_token
 from edutap.pass_builder.models.db import ApiClient, Tenant
 from edutap.pass_builder.models.enums import Scope
-from edutap.pass_builder.settings import get_settings
+from edutap.pass_builder.settings import get_database_settings
 
 
 async def main() -> None:
-    engine = create_async_engine(get_settings().database_url)
+    engine = create_async_engine(get_database_settings().async_url)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     token = uuid4().hex
     async with session_factory() as session:

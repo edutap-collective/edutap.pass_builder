@@ -38,16 +38,17 @@ from edutap.pass_builder.app import create_app
 from edutap.pass_builder.auth import hash_token
 from edutap.pass_builder.clients.data_provider import CatalogueField
 from edutap.pass_builder.database import get_session
-from edutap.pass_builder.dependencies import get_data_provider, get_objectstore
+from edutap.pass_builder.dependencies import (
+    get_data_provider,
+    get_image_service,
+    get_objectstore,
+)
 from edutap.pass_builder.models.db import ApiClient, Tenant
 from edutap.pass_builder.models.enums import Scope
 
 # Settings() requires these; get_settings() is only ever exercised through
 # these router tests (no other test module resolves it), so setting them
 # once at collection time is safe and does not leak into other suites.
-os.environ.setdefault(
-    "EDUTAP_PASS_BUILDER_DATABASE_URL", "postgresql+asyncpg://unused/unused"
-)
 os.environ.setdefault(
     "EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY",
     base64.b64encode(os.urandom(32)).decode(),
@@ -104,6 +105,18 @@ class FakeDataProvider:
         return self.catalogue
 
 
+class FakeImageService:
+    """Returns configured bytes for an image reference, reaching no network."""
+
+    def __init__(self) -> None:
+        self.responses: dict[str, bytes] = {}
+        self.requested: list[str] = []
+
+    async def fetch(self, url: str) -> bytes:
+        self.requested.append(url)
+        return self.responses.get(url, b"\x89PNG")
+
+
 @pytest.fixture
 def objectstore() -> FakeObjectStore:
     return FakeObjectStore()
@@ -115,7 +128,12 @@ def data_provider() -> FakeDataProvider:
 
 
 @pytest.fixture
-def app(session, objectstore, data_provider):
+def image_service() -> FakeImageService:
+    return FakeImageService()
+
+
+@pytest.fixture
+def app(session, objectstore, data_provider, image_service):
     """A `create_app()` instance with I/O dependencies replaced by fakes."""
 
     async def override_get_session():
@@ -125,6 +143,7 @@ def app(session, objectstore, data_provider):
     application.dependency_overrides[get_session] = override_get_session
     application.dependency_overrides[get_objectstore] = lambda: objectstore
     application.dependency_overrides[get_data_provider] = lambda: data_provider
+    application.dependency_overrides[get_image_service] = lambda: image_service
     return application
 
 

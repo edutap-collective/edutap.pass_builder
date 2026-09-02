@@ -14,6 +14,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .clients.data_provider import DataProviderClient
+from .clients.image_service import ImageServiceClient
 from .clients.objectstore import ObjectStore
 from .database import get_session
 from .secrets.backend import SecretBackend
@@ -33,6 +34,16 @@ def get_data_provider(request: Request, settings: SettingsDep) -> DataProviderCl
         base_url=settings.data_provider_base_url,
         token=settings.data_provider_token.get_secret_value(),
         timeout=settings.data_provider_timeout,
+        client=request.app.state.http,
+    )
+
+
+def get_image_service(request: Request, settings: SettingsDep) -> ImageServiceClient:
+    """Build an `ImageServiceClient` from settings and the shared HTTP client."""
+    return ImageServiceClient(
+        base_url=settings.image_service_base_url,
+        token=settings.image_service_token.get_secret_value(),
+        timeout=settings.image_service_timeout,
         client=request.app.state.http,
     )
 
@@ -73,6 +84,7 @@ def get_render_service(
     templates: Annotated[TemplateService, Depends(get_template_service)],
     credentials: Annotated[CredentialService, Depends(get_credential_service)],
     data_provider: Annotated[DataProviderClient, Depends(get_data_provider)],
+    images: Annotated[ImageServiceClient, Depends(get_image_service)],
     settings: SettingsDep,
 ) -> RenderService:
     """Build a `RenderService` bound to the session and its collaborators.
@@ -87,5 +99,6 @@ def get_render_service(
         templates,
         credentials,
         data_provider,
+        images=images,
         wwdr_certificate_path=settings.wwdr_certificate_path,
     )

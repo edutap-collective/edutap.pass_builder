@@ -171,6 +171,17 @@ class VersionResponse(BaseModel):
     published_at: datetime | None = None
 
 
+class CatalogueExport(BaseModel):
+    """The field catalogue as `edutap.pass_designer` loads it.
+
+    A wrapper object rather than a bare list because that is the file the
+    designer reads (`PASS_DESIGNER_CATALOGUE_PATH`), and a shape that has to be
+    edited on the way over is a shape that will be edited wrongly once.
+    """
+
+    fields: list["FieldResponse"]
+
+
 class MappingRulesRequest(BaseModel):
     """Request body to replace a draft version's mapping rules."""
 
@@ -280,6 +291,7 @@ class AuditEntryResponse(BaseModel):
     ts: datetime
     request_id: str
     actor_client_id: UUID | None = None
+    actor_principal: str | None = None
     action: str
     outcome: str
     error_code: str | None = None

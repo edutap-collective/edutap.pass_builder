@@ -34,6 +34,7 @@ except `/healthz` and `/readyz`, which require no authentication at all.
 | `PUT` | `/passes/{pass_id}` | update a pass — the variant may change here |
 | `POST` | `/passes/{pass_id}/save-link` | Google: generate a save link |
 | `POST` | `/passes/preview` | dry run: substitute, never sign or push |
+| `GET` | `/passes/{pass_type_identifier}/{serial_number}` | Apple: deliver the current pass by Apple's key alone |
 
 ### `POST /passes`
 
@@ -108,6 +109,50 @@ Response (`PreviewResponse`):
   "object_json": null,
   "bound_fields": ["person.name"]
 }
+```
+
+### `GET /passes/{pass_type_identifier}/{serial_number}`
+
+The delivery path.
+`edutap.wallet_apple_vas_web_service` holds registrations and knows no person,
+no template and no validity — the ignorance that makes it reusable at another
+institution — so it asks with the only two values Apple gives it.
+
+Returns the `.pkpass` bytes, exactly like `POST /passes` for an Apple wallet
+type, with the same `X-Template-Version`, `X-Variant` and `X-Credential-Set`
+headers.
+
+**The pass is rebuilt, not fetched from store.**
+This service persists no issued pass, and a stored copy would be a second truth
+with an unbounded staleness and a personal pass sitting at rest.
+What comes back is what the current published version and the person's current
+data produce.
+
+**And this service still keeps no pass register.**
+It reads `public.pass_state` — the table the pass-state consumer owns and
+writes — to recover the two things Apple's key cannot carry: which person the
+pass is for and which template it was built from.
+Reading a table in the shared contract schema is what that schema is for; the
+distinction is the same one that makes `deactivate` a `POST` rather than a
+`DELETE`.
+
+`pass_type_identifier` is checked against the variant's credential set, which
+carries the identifier parsed out of the signing certificate.
+It is a guard rather than a lookup key — the tenant comes from the token — and
+a mismatch answers `404 pass_not_found`, the same as an unknown serial number,
+so the difference between the two answers reveals nothing.
+
+| Status | When |
+|---|---|
+| `200` | the pass, rebuilt |
+| `404` | no such serial number, not an Apple pass, or the wrong pass type |
+| `410` | the pass was withdrawn — a device should stop asking, where a `404` invites a retry |
+| `502` | the data provider could not be reached |
+
+```{note}
+This route needs `SELECT` on `public.pass_state`.
+A deployment whose database role has rights only in the `pass_builder` schema
+answers `500` here and nowhere else.
 ```
 
 ## Templates — scope `manage`

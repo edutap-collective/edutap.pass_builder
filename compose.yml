@@ -23,7 +23,10 @@ services:
     depends_on:
       db: { condition: service_healthy }
     environment:
-      EDUTAP_PASS_BUILDER_DATABASE_URL: postgresql+asyncpg://pass_builder:pass_builder@db/pass_builder
+      EDUTAP_PASS_BUILDER_DB_HOSTS: db
+      EDUTAP_PASS_BUILDER_DB_DATABASE: pass_builder
+      EDUTAP_PASS_BUILDER_DB_USER: pass_builder
+      EDUTAP_PASS_BUILDER_DB_PASSWORD: pass_builder
       EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY: ${EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY}
       EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL: http://data-provider
       EDUTAP_PASS_BUILDER_OBJECTSTORE_ENDPOINT_URL: http://objectstore:9000

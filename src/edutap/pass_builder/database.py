@@ -10,14 +10,14 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from .settings import get_settings
+from .settings import get_database_settings
 
 
 @lru_cache
 def get_engine() -> AsyncEngine:
     """Return the process-wide async engine."""
     return create_async_engine(
-        get_settings().database_url, future=True, pool_pre_ping=True
+        get_database_settings().async_url, future=True, pool_pre_ping=True
     )
 
 

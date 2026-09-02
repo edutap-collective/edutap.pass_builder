@@ -169,3 +169,37 @@ async def preview_pass(
         sample_data=body.sample_data or {},
     )
     return PreviewResponse(**result)
+
+
+@router.get("/passes/{pass_type_identifier}/{serial_number}")
+async def fetch_apple_pass(
+    pass_type_identifier: str,
+    serial_number: str,
+    request: Request,
+    auth: AuthContext = Depends(require(Scope.RENDER)),  # noqa: B008
+    renderer: RenderService = Depends(get_render_service),  # noqa: B008
+) -> Response:
+    """Return the current `.pkpass` for an issued pass, by Apple's key alone.
+
+    THE DELIVERY PATH for `wallet_apple_vas_web_service`, which holds
+    registrations and knows no person, no template and no validity -- that
+    ignorance is what makes it reusable at another institution, and it is why
+    this route takes the only two values Apple gives it.
+
+    A `GET`, and the only one on `/passes`: it has no effect beyond an audit
+    entry, and a device may repeat it. The pass is *rebuilt* from the current
+    template version and the person's current data rather than fetched from
+    store -- this service holds no issued pass, and a stored copy would be a
+    second truth with an unbounded staleness and a personal pass at rest.
+
+    `410` for a withdrawn pass, distinct from the `404` of one that was never
+    there: a device asking for a revoked pass should stop asking, and a `404`
+    invites a retry.
+    """
+    result = await renderer.fetch_apple_pass(
+        auth,
+        pass_type_identifier=pass_type_identifier,
+        serial_number=serial_number,
+        request_id=request.headers.get("x-request-id"),
+    )
+    return _apple_response(result)

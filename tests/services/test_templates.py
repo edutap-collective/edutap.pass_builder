@@ -593,3 +593,125 @@ async def test_update_variant_accepts_own_tenants_credential_set(
         google_class_id=None,
     )
     assert variant.credential_set_id == own_credential.id
+
+
+async def _apple_draft_with_rule(session, objectstore, rule: RuleSpec):
+    """An Apple draft carrying its icon and exactly one mapping rule."""
+    seeded = await seed_variant(session, wallet_type=WalletType.APPLE_VAS)
+    version = TemplateVersion(
+        variant_id=seeded.variant_id,
+        number=1,
+        status=VersionStatus.DRAFT,
+        pass_json={
+            "formatVersion": 1,
+            "generic": {"primaryFields": [{"key": "name", "value": ""}]},
+        },
+    )
+    session.add(version)
+    session.add(
+        DataField(key="person.photo", value_type=ValueType.IMAGE, label="Photo")
+    )
+    session.add(DataField(key="person.name", value_type=ValueType.TEXT, label="Name"))
+    await session.flush()
+    svc = TemplateService(session, objectstore)
+    await svc._store_asset(  # noqa: SLF001 - inject the icon without a full bundle
+        seeded.tenant_id, version, "icon.png", b"\x89PNG"
+    )
+    await svc.set_mappings(seeded.tenant_id, version.id, [rule])
+    return svc, seeded, version
+
+
+async def test_publish_rejects_an_image_value_on_a_text_target(session, objectstore):
+    """Resolved bytes would be `str()`-ed into a text field, silently."""
+    svc, seeded, version = await _apple_draft_with_rule(
+        session,
+        objectstore,
+        RuleSpec(
+            target_kind=TargetKind.FIELD_VALUE,
+            target="name",
+            source_field="person.photo",
+            value_type=ValueType.IMAGE,
+        ),
+    )
+
+    with pytest.raises(ProblemError) as excinfo:
+        await svc.publish(seeded.tenant_id, version.id)
+    findings = excinfo.value.extra["findings"]
+    assert any("image value must bind an image target" in f for f in findings)
+
+
+async def test_publish_rejects_a_text_value_on_an_image_target(session, objectstore):
+    """`apply_apple` writes the asset only for bytes -- a string lands nowhere."""
+    svc, seeded, version = await _apple_draft_with_rule(
+        session,
+        objectstore,
+        RuleSpec(
+            target_kind=TargetKind.IMAGE,
+            target="thumbnail.png",
+            source_field="person.name",
+            value_type=ValueType.TEXT,
+        ),
+    )
+
+    with pytest.raises(ProblemError) as excinfo:
+        await svc.publish(seeded.tenant_id, version.id)
+    findings = excinfo.value.extra["findings"]
+    assert any("image target requires an image value type" in f for f in findings)
+
+
+async def test_publish_accepts_an_image_value_on_an_image_target(session, objectstore):
+    svc, seeded, version = await _apple_draft_with_rule(
+        session,
+        objectstore,
+        RuleSpec(
+            target_kind=TargetKind.IMAGE,
+            target="thumbnail.png",
+            source_field="person.photo",
+            value_type=ValueType.IMAGE,
+        ),
+    )
+
+    published = await svc.publish(seeded.tenant_id, version.id)
+
+    assert published.status == VersionStatus.PUBLISHED
+
+
+async def test_publish_rejects_an_image_target_on_a_google_variant(
+    session, objectstore
+):
+    """A Google object has no asset bundle; it carries images as URLs.
+
+    `apply_google` resolves placeholders by source field and ignores
+    `target_kind` entirely, so such a rule would do nothing at all.
+    """
+    seeded = await seed_variant(session, wallet_type=WalletType.GOOGLE_ST)
+    version = TemplateVersion(
+        variant_id=seeded.variant_id,
+        number=1,
+        status=VersionStatus.DRAFT,
+        class_json={"id": "1.class"},
+        object_json={"id": "1.object", "heroImage": "${person.photo}"},
+    )
+    session.add(version)
+    session.add(
+        DataField(key="person.photo", value_type=ValueType.IMAGE, label="Photo")
+    )
+    await session.flush()
+    svc = TemplateService(session, objectstore)
+    await svc.set_mappings(
+        seeded.tenant_id,
+        version.id,
+        [
+            RuleSpec(
+                target_kind=TargetKind.IMAGE,
+                target="heroImage",
+                source_field="person.photo",
+                value_type=ValueType.IMAGE,
+            )
+        ],
+    )
+
+    with pytest.raises(ProblemError) as excinfo:
+        await svc.publish(seeded.tenant_id, version.id)
+    findings = excinfo.value.extra["findings"]
+    assert any("not supported on a google variant" in f for f in findings)

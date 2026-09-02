@@ -47,7 +47,10 @@ this from the host against the port `compose.yml` publishes rather than
 inside the `app` container:
 
 ```shell
-export EDUTAP_PASS_BUILDER_DATABASE_URL=postgresql+asyncpg://pass_builder:pass_builder@localhost/pass_builder
+export EDUTAP_PASS_BUILDER_DB_HOSTS=localhost
+export EDUTAP_PASS_BUILDER_DB_DATABASE=pass_builder
+export EDUTAP_PASS_BUILDER_DB_USER=pass_builder
+export EDUTAP_PASS_BUILDER_DB_PASSWORD=pass_builder
 uv run alembic upgrade head
 ```
 

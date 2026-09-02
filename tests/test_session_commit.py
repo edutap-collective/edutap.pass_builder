@@ -18,7 +18,7 @@ raise out of it (rollback), then open a *second*, independent
 `get_session()` context to check what a later request would actually see
 in the database. `get_engine()` is monkeypatched to the session-scoped
 `engine` fixture (the Postgres testcontainer the rest of the suite already
-runs) rather than the real `Settings.database_url` -- the narrowest way to
+runs) rather than the real `DatabaseSettings` -- the narrowest way to
 redirect `get_session` at a real, disposable database.
 """
 
@@ -92,10 +92,10 @@ async def _schema(engine):
 
 @pytest.fixture(autouse=True)
 def _use_test_engine(monkeypatch, engine):
-    """Redirect the real `get_session` at the test engine, not `database_url`.
+    """Redirect the real `get_session` at the test engine, not the cluster.
 
     `get_session` resolves its engine via the process-wide, `lru_cache`d
-    `get_engine()`, which in production reads `Settings.database_url`.
+    `get_engine()`, which in production reads `DatabaseSettings`.
     Patching `get_engine` itself is the narrowest way to point it at the
     Postgres testcontainer instead, without constructing a `Settings` or
     touching the cache any other test might rely on.

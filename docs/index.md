@@ -23,6 +23,7 @@ tutorials/first-pass
 how-to/obtain-and-install-an-apple-credential
 how-to/import-a-pkpasstemplate
 how-to/run-the-docker-test-environment
+how-to/run-the-management-ui
 how-to/configure-credentials-and-wwdr
 ```
 

@@ -13,7 +13,10 @@ Every setting is read from the environment with the prefix
 Three have no default and must always be set:
 
 ```text
-EDUTAP_PASS_BUILDER_DATABASE_URL=postgresql+asyncpg://user:password@host/dbname
+EDUTAP_PASS_BUILDER_DB_HOSTS=pg-a,pg-b,pg-c
+EDUTAP_PASS_BUILDER_DB_DATABASE=edutap
+EDUTAP_PASS_BUILDER_DB_USER=pass_builder
+EDUTAP_PASS_BUILDER_DB_PASSWORD=…
 EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY=<base64-encoded 32-byte key>
 EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL=https://data-provider.example
 ```

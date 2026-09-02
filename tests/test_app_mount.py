@@ -14,7 +14,6 @@ from edutap.pass_builder.settings import get_settings
 @pytest.fixture(autouse=True)
 def settings_env(monkeypatch):
     """Required settings plus a clean get_settings cache for every test."""
-    monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATABASE_URL", "postgresql+asyncpg://x/y")
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY", "a" * 44)
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL", "http://dp")
     get_settings.cache_clear()
