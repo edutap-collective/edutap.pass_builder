@@ -36,8 +36,20 @@ jobs:
       # before the first one was collected, which is why every run since
       # 2026-08-07 was red without naming a cause.
       #
-      # `uv sync` honours uv.lock, so the CI resolves what a developer
-      # resolved rather than whatever is newest that morning.
+      # THE CI RESOLVES FRESH ON EVERY RUN, and that is a deliberate trade-off
+      # rather than an oversight: `uv.lock` is in `.gitignore`, so `uv sync`
+      # has nothing to honour here. A comment above this line used to claim the
+      # opposite -- that the CI resolves what a developer resolved -- and it was
+      # never true in this repository.
+      #
+      # What it buys: a dependency that breaks us shows up in the CI on the day
+      # it is published, not months later. What it costs: green locally is not
+      # a promise of green here. On 2026-09-03 that cost was real -- `ty` 0.0.78
+      # added a deprecation diagnostic, the local `uv.lock` still pinned 0.0.77,
+      # and the run went red on a merge that had touched only TypeScript.
+      #
+      # So: read this job's log, not the local one, before calling a branch
+      # ready. `uvx ty@<version from the log> check` reproduces it.
       - name: Install the project with its dev and docs extras
         run: uv sync --extra dev --extra docs
 
