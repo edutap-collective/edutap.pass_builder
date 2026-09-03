@@ -54,10 +54,10 @@ export function App() {
           {tab === "catalogue" ? <Catalogue tenantId={tenantId} /> : null}
         </>
       ) : (
-        // Die Reiter stehen auch ohne Mandant da, ausgegraut. Sonst zeigt der
-        // erste Aufruf ein Formular mit zwei Feldern und laesst offen, wozu --
-        // und die Ebenen darunter (Vorlagen, Credentials, Token) sieht man
-        // erst, wenn man den Schritt schon getan hat.
+        // The tabs are shown greyed out even with no tenant. Otherwise the
+        // first visit is a form with two boxes and no hint what for -- and the
+        // levels beneath a tenant (templates, credentials, tokens) only become
+        // visible after the step has already been taken.
         <nav aria-disabled="true" className="preview">
           {TABS.map((name) => (
             <button key={name} disabled>

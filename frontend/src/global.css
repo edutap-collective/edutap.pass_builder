@@ -86,20 +86,23 @@ td {
   border-left: 2px solid rgb(128 128 128 / 0.3);
 }
 
-/* Die Reiter, solange kein Mandant gewählt ist: sichtbar, aber nicht benutzbar.
-   Sie beantworten die Frage "und dann?", bevor jemand sie stellen muss. */
+/* The tabs while no tenant is selected: visible, not usable. They answer the
+   question "and then what?" before anybody has to ask it. */
 nav.preview button {
   opacity: 0.45;
 }
 
-label > small {
-  display: block;
-  opacity: 0.7;
-  font-size: 0.8rem;
-}
-
-form label {
+/* Scoped to the tenant form on purpose. A bare `form label` would restack every
+   other label in the interface -- the provider selector in Credentials, for one
+   -- and that is a change nobody asked for. */
+.tenants form label {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+}
+
+.tenants label > small {
+  display: block;
+  opacity: 0.7;
+  font-size: 0.8rem;
 }

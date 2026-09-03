@@ -155,7 +155,7 @@ export function Credentials({ tenantId }: { tenantId: string }) {
       {create.error ? <Problem error={create.error} /> : null}
 
       {credentials.error ? <Problem error={credentials.error} /> : null}
-      {credentials.data?.length ? (
+      {credentials.data === undefined ? null : credentials.data.length ? (
         <table>
           <thead>
             <tr>

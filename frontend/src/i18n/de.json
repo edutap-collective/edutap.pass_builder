@@ -11,7 +11,7 @@
     "name": "Offizieller Name",
     "explain": "Ein Mandant ist die Einheit, der Vorlagen, Signing-Credentials und API-Token gehören. Alles Weitere wird darunter angelegt — erst den Mandanten wählen, dann die Reiter.",
     "keyExample": "lmu",
-    "keyHint": "Intern, klein und ohne Leerzeichen. Steht im Audit-Log und in Pfaden.",
+    "keyHint": "Intern, klein und ohne Leerzeichen. Muss eindeutig sein und lässt sich später nicht mehr ändern; danach ist die Liste sortiert.",
     "nameExample": "Ludwig-Maximilians-Universität München",
     "nameHint": "Wie die Einrichtung wirklich heißt. Nur zur Anzeige.",
     "loadFailed": "Die Liste konnte nicht geladen werden — das ist etwas anderes als ein leerer Bestand. Häufigste Ursache: Das Datenbankschema des Dienstes fehlt, weil der Migrationslauf nicht durchlief."

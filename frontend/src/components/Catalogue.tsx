@@ -59,7 +59,7 @@ export function Catalogue({ tenantId }: { tenantId: string }) {
       {refresh.error ? <Problem error={refresh.error} /> : null}
 
       {fields.error ? <Problem error={fields.error} /> : null}
-      {fields.data?.length ? (
+      {fields.data === undefined ? null : fields.data.length ? (
         <table>
           <thead>
             <tr>

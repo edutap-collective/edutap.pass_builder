@@ -55,12 +55,10 @@ export function Tenants({
 
   if (tenants.isLoading) return <p>{t("common.loading")}</p>;
 
-  // EIN FEHLGESCHLAGENES LADEN SIEHT SONST AUS WIE EIN LEERER BESTAND. Das war
-  // es bis zum 2026-09-03: `(tenants.data ?? [])` machte aus einem 500 die
-  // Meldung "Noch kein Mandant angelegt", und die erste Person vor dieser Maske
-  // hat genau daran eine halbe Stunde verloren. Ein Fehler beim Lesen ist keine
-  // Abwesenheit von Daten, und die Oberflaeche darf die beiden nicht
-  // gleichsetzen.
+  // A FAILED LOAD MUST NOT LOOK LIKE AN EMPTY ESTATE. Until 2026-09-03
+  // `(tenants.data ?? [])` turned a 500 into "no tenant yet", and the first
+  // person in front of this interface lost time to exactly that. An error while
+  // reading is not an absence of data.
   if (tenants.error) {
     return (
       <div className="tenants">
