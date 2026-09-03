@@ -107,6 +107,7 @@ export function ApiClients({ tenantId }: { tenantId: string }) {
       {create.error ? <Problem error={create.error} /> : null}
       {revoke.error ? <Problem error={revoke.error} /> : null}
 
+      {clients.error ? <Problem error={clients.error} /> : null}
       {clients.data?.length ? (
         <table>
           <thead>

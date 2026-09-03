@@ -55,8 +55,24 @@ export function Tenants({
 
   if (tenants.isLoading) return <p>{t("common.loading")}</p>;
 
+  // EIN FEHLGESCHLAGENES LADEN SIEHT SONST AUS WIE EIN LEERER BESTAND. Das war
+  // es bis zum 2026-09-03: `(tenants.data ?? [])` machte aus einem 500 die
+  // Meldung "Noch kein Mandant angelegt", und die erste Person vor dieser Maske
+  // hat genau daran eine halbe Stunde verloren. Ein Fehler beim Lesen ist keine
+  // Abwesenheit von Daten, und die Oberflaeche darf die beiden nicht
+  // gleichsetzen.
+  if (tenants.error) {
+    return (
+      <div className="tenants">
+        <Problem error={tenants.error} />
+        <p className="hint">{t("tenant.loadFailed")}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="tenants">
+      <p className="hint">{t("tenant.explain")}</p>
       <label>
         {t("tenant.label")}{" "}
         <select
@@ -78,20 +94,26 @@ export function Tenants({
           create.mutate();
         }}
       >
-        <input
-          aria-label={t("tenant.key")}
-          placeholder={t("tenant.key")}
-          value={key}
-          onChange={(event) => setKey(event.target.value)}
-          required
-        />
-        <input
-          aria-label={t("tenant.name")}
-          placeholder={t("tenant.name")}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          required
-        />
+        <label>
+          {t("tenant.key")}
+          <input
+            placeholder={t("tenant.keyExample")}
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+            required
+          />
+          <small>{t("tenant.keyHint")}</small>
+        </label>
+        <label>
+          {t("tenant.name")}
+          <input
+            placeholder={t("tenant.nameExample")}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+          />
+          <small>{t("tenant.nameHint")}</small>
+        </label>
         <button type="submit" disabled={create.isPending}>
           {t("tenant.create")}
         </button>

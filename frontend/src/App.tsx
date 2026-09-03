@@ -53,7 +53,19 @@ export function App() {
           {tab === "clients" ? <ApiClients tenantId={tenantId} /> : null}
           {tab === "catalogue" ? <Catalogue tenantId={tenantId} /> : null}
         </>
-      ) : null}
+      ) : (
+        // Die Reiter stehen auch ohne Mandant da, ausgegraut. Sonst zeigt der
+        // erste Aufruf ein Formular mit zwei Feldern und laesst offen, wozu --
+        // und die Ebenen darunter (Vorlagen, Credentials, Token) sieht man
+        // erst, wenn man den Schritt schon getan hat.
+        <nav aria-disabled="true" className="preview">
+          {TABS.map((name) => (
+            <button key={name} disabled>
+              {t(`tabs.${name}`)}
+            </button>
+          ))}
+        </nav>
+      )}
     </main>
   );
 }

@@ -85,3 +85,21 @@ td {
   padding-left: 0.75rem;
   border-left: 2px solid rgb(128 128 128 / 0.3);
 }
+
+/* Die Reiter, solange kein Mandant gewählt ist: sichtbar, aber nicht benutzbar.
+   Sie beantworten die Frage "und dann?", bevor jemand sie stellen muss. */
+nav.preview button {
+  opacity: 0.45;
+}
+
+label > small {
+  display: block;
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}

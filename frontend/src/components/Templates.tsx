@@ -81,6 +81,7 @@ export function Templates({ tenantId }: { tenantId: string }) {
 
       {create.error ? <Problem error={create.error} /> : null}
 
+      {templates.error ? <Problem error={templates.error} /> : null}
       {templates.data?.length ? (
         <ul className="templates">
           {templates.data.map((template) => (

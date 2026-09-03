@@ -1,11 +1,20 @@
 {
-  "app": { "title": "eduTAP Pass Builder", "subtitle": "Templates, mapping rules and signing credentials" },
+  "app": {
+    "title": "eduTAP Pass Builder",
+    "subtitle": "Templates, mapping rules and signing credentials"
+  },
   "tenant": {
     "label": "Tenant",
     "none": "No tenant yet",
     "create": "Create tenant",
-    "key": "Key",
-    "name": "Name"
+    "key": "Short name",
+    "name": "Official name",
+    "explain": "A tenant owns templates, signing credentials and API tokens. Everything else is created beneath one — pick a tenant first, then use the tabs.",
+    "keyExample": "lmu",
+    "keyHint": "Internal, lower case, no spaces. Appears in the audit log and in paths.",
+    "nameExample": "Ludwig-Maximilians-Universität München",
+    "nameHint": "What the institution is actually called. Display only.",
+    "loadFailed": "The list could not be loaded — which is not the same as an empty one. Most likely the service's database schema is missing because the migration did not run."
   },
   "tabs": {
     "templates": "Templates",
