@@ -14,7 +14,7 @@ import io
 import json
 import os
 import zipfile
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
@@ -95,7 +95,7 @@ class E2eEnv:
 
 
 @pytest.fixture
-async def e2e_env(session) -> AsyncIterator[E2eEnv]:
+async def e2e_env(session) -> AsyncGenerator[E2eEnv]:
     """Seed a tenant, an Apple credential, a published template and a data provider.
 
     Runs against the Postgres testcontainer (`session`, from the top-level

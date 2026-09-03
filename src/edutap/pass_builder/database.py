@@ -1,6 +1,6 @@
 """Database engine and session dependency."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from functools import lru_cache
 
 from sqlalchemy.ext.asyncio import (
@@ -21,7 +21,12 @@ def get_engine() -> AsyncEngine:
     )
 
 
-async def get_session() -> AsyncIterator[AsyncSession]:
+# `AsyncGenerator`, not `AsyncIterator`: typeshed deprecated the
+# `asynccontextmanager` overload that takes a function returning the latter, and
+# `tests/test_session_commit.py` wraps `get_session` in exactly that. The two
+# `lifespan` functions carry the same annotation for the same reason -- FastAPI
+# applies `asynccontextmanager` to them itself.
+async def get_session() -> AsyncGenerator[AsyncSession]:
     """Yield a session for one request, committing or rolling it back.
 
     Every write a request makes -- template/credential/publish/sync

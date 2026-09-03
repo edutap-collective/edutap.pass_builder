@@ -1,7 +1,7 @@
 """FastAPI application factory and lifespan."""
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 
@@ -72,7 +72,7 @@ it (settings.base_path) varies per deployment.
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Provision the shared HTTP client and the object-store bucket.
 
     The `httpx.AsyncClient` is created once and reused across every request

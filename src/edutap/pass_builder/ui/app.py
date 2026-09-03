@@ -6,7 +6,7 @@ the same `services/` layer -- see
 here rather than in a service of its own.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -54,7 +54,7 @@ should not find the other's routes in its schema.
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Provision the shared HTTP client.
 
     The same client the render application keeps, for the same reason: the
