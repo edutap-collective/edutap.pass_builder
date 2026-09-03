@@ -37,7 +37,22 @@ dependencies = [
     # mode of that is silence: the mounted password is never read, and nothing
     # observable separates it from a deployment that has no secret at all. It
     # crash-looped two sibling services on 2026-08-27 for exactly that reason.
-    "edutap.db_definitions>=0.3.2,<0.4",
+    # `[cli]` -- and this image is why. Since 2026-09-03 the deploy migrates this
+    # package's schema by running `edutap-dbdef migrate` from THIS image: the tool
+    # collects the schemas of the packages installed beside it, and beside it here
+    # is exactly this one plus the contract. That saves the estate a second image
+    # with a filled `packages.txt`, a second CI and a second registry token.
+    #
+    # The extra carries `psycopg[binary]`, the SYNCHRONOUS driver. The service
+    # itself speaks `asyncpg` and needs none of it, which is why the image had
+    # none -- and `edutap-dbdef migrate` then died on `No module named 'psycopg'`
+    # before it opened a single connection. Measured against the published image
+    # of 2026-09-03 before this line existed.
+    #
+    # A few megabytes for a driver an ASGI process never imports. The alternative
+    # is a second image built from this one's dependency set, which is the same
+    # megabytes plus a pipeline.
+    "edutap.db_definitions[cli]>=0.3.3,<0.4",
     # Errors, traces and structured logging. `[fastapi]` because this service is
     # one, and the extra is what carries the instrumentation.
     "edutap.observability_settings[fastapi]>=0.1.6,<0.2",
