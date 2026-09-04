@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { client } from "../api/client";
 import type { components } from "../api/schema";
+import { JsonEditor } from "./JsonEditor";
+import { PassPreview } from "./PassPreview";
 import { Problem } from "./Tenants";
 
 type Template = { id: string; key: string; name: string };
@@ -313,6 +315,15 @@ function VersionUpload({
   const [error, setError] = useState<unknown>(null);
   const isApple = variant.wallet_type.startsWith("APPLE");
 
+  // The Google payloads are held as TEXT, not as parsed objects. Picking the
+  // files used to post them straight through, so the first sight of what was
+  // sent was whatever the service said about it afterwards. Kept as text, they
+  // can be read, corrected and previewed before anything is saved -- and a file
+  // that does not parse is still editable, which a parsed object would not be.
+  const [classText, setClassText] = useState("");
+  const [objectText, setObjectText] = useState("");
+  const [rulesText, setRulesText] = useState("");
+
   async function uploadBundle(file: File) {
     setError(null);
     const body = new FormData();
@@ -331,10 +342,27 @@ function VersionUpload({
     else onCreated();
   }
 
-  async function importDesigner(files: FileList) {
+  /** Load the picked files into the editors, without sending anything. */
+  async function loadDesigner(files: FileList) {
     setError(null);
     try {
       const trio = await readDesignerTrio(files);
+      setClassText(JSON.stringify(trio.classJson, null, 2));
+      setObjectText(JSON.stringify(trio.objectJson, null, 2));
+      setRulesText(trio.rules ? JSON.stringify(trio.rules, null, 2) : "");
+    } catch (failure) {
+      setError(failure);
+    }
+  }
+
+  async function importDesigner() {
+    setError(null);
+    try {
+      const trio = {
+        classJson: JSON.parse(classText) as unknown,
+        objectJson: JSON.parse(objectText) as unknown,
+        rules: rulesText.trim() ? (JSON.parse(rulesText) as unknown) : null,
+      };
       const { data, error: created } = await client.POST(
         "/api/v1/tenants/{tenant_id}/variants/{variant_id}/versions",
         {
@@ -356,16 +384,24 @@ function VersionUpload({
           "/api/v1/tenants/{tenant_id}/versions/{version_id}/mappings",
           {
             params: { path: { tenant_id: tenantId, version_id: versionId } },
-            body: { rules: trio.rules },
+            // Freely edited text, so the generated row type does not
+            // apply here; the service validates the shape it accepts.
+            body: { rules: trio.rules } as unknown as never,
           },
         );
         if (bound) throw bound;
       }
+      setClassText("");
+      setObjectText("");
+      setRulesText("");
       onCreated();
     } catch (failure) {
       setError(failure);
     }
   }
+
+  const ready =
+    classText.trim() !== "" && objectText.trim() !== "" && parses(classText) && parses(objectText);
 
   return (
     <div className="upload">
@@ -382,18 +418,54 @@ function VersionUpload({
           />
         </label>
       ) : (
-        <label>
-          {t("templates.designerFiles")}{" "}
-          <input
-            type="file"
-            multiple
-            accept=".json"
-            onChange={(event) => {
-              const files = event.target.files;
-              if (files?.length) void importDesigner(files);
-            }}
-          />
-        </label>
+        <>
+          <label>
+            {t("templates.designerFiles")}{" "}
+            <input
+              type="file"
+              multiple
+              accept=".json"
+              onChange={(event) => {
+                const files = event.target.files;
+                if (files?.length) void loadDesigner(files);
+              }}
+            />
+          </label>
+
+          {classText || objectText ? (
+            <div className="split">
+              <div>
+                <JsonEditor
+                  name="class.json"
+                  value={classText}
+                  onChange={setClassText}
+                />
+                <JsonEditor
+                  name="object.json"
+                  value={objectText}
+                  onChange={setObjectText}
+                />
+                {rulesText ? (
+                  <JsonEditor
+                    name="mappings.json"
+                    value={rulesText}
+                    onChange={setRulesText}
+                    rows={8}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  className="action"
+                  disabled={!ready}
+                  onClick={() => void importDesigner()}
+                >
+                  {t("templates.saveVersion")}
+                </button>
+              </div>
+              <PassPreview classJson={classText} objectJson={objectText} />
+            </div>
+          ) : null}
+        </>
       )}
       {error ? <Problem error={error} /> : null}
     </div>
@@ -431,4 +503,15 @@ export async function readDesignerTrio(files: FileList | File[]): Promise<{
   }
   const mappings = await read("mappings.json");
   return { classJson, objectJson, rules: mappings?.rules ?? null };
+}
+
+
+/** True when the text is JSON a server would accept. */
+function parses(source: string): boolean {
+  try {
+    JSON.parse(source);
+    return true;
+  } catch {
+    return false;
+  }
 }

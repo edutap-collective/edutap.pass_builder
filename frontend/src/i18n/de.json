@@ -39,7 +39,8 @@
     "uploadBundle": "pkpasstemplate hochladen",
     "designerFiles": "Designer-Dateien (class.json, object.json, mappings.json)",
     "importDesigner": "Aus dem Designer übernehmen",
-    "valid": "Keine Beanstandungen"
+    "valid": "Keine Beanstandungen",
+    "saveVersion": "Fassung speichern"
   },
   "credentials": {
     "empty": "Keine Credentials",
@@ -82,5 +83,25 @@
     "cancel": "Abbrechen",
     "error": "Fehler",
     "close": "Schließen"
+  },
+  "bar": {
+    "choose": "Mandant wählen",
+    "key": "Kürzel"
+  },
+  "rail": {
+    "label": "Mandanten-Navigation",
+    "tenant": "Mandant",
+    "pickFirst": "Erst einen Mandanten wählen.",
+    "manageTenants": "Mandanten verwalten"
+  },
+  "json": {
+    "empty": "leer",
+    "valid": "{{count}} Zeilen, gültig",
+    "broken": "kein gültiges JSON"
+  },
+  "preview": {
+    "empty": "Die Vorschau erscheint, sobald class.json oder object.json gültig sind.",
+    "noIssuer": "Ohne Herausgeber",
+    "note": "Gezeichnet aus der Nutzlast, nicht von Google. Abstände und Schrift sind die dieser Oberfläche; die Wallet weicht im Detail ab."
   }
 }

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { API_PREFIX, client } from "../api/client";
 import type { components } from "../api/schema";
+import { JsonEditor } from "./JsonEditor";
 import { Problem } from "./Tenants";
 
 type CredentialSet = {
@@ -137,11 +138,15 @@ export function Credentials({ tenantId }: { tenantId: string }) {
               onChange={(e) => setIssuerId(e.target.value)}
               required
             />
-            <textarea
-              aria-label={t("credentials.serviceAccount")}
-              placeholder={t("credentials.serviceAccount")}
+            {/* The service account file runs to a dozen keys, one of which is
+                a PEM with escaped newlines in it. As a bare textarea a stray
+                character only surfaced on save, as a server-side parse error
+                with an offset nobody could map back to a line. */}
+            <JsonEditor
+              name="service-account.json"
               value={serviceAccount}
-              onChange={(e) => setServiceAccount(e.target.value)}
+              onChange={setServiceAccount}
+              rows={10}
               required
             />
           </>
