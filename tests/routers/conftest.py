@@ -56,6 +56,7 @@ os.environ.setdefault(
 os.environ.setdefault(
     "EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL", "http://data-provider.invalid"
 )
+os.environ.setdefault("EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE", "full_view")
 
 
 @pytest.fixture(autouse=True)

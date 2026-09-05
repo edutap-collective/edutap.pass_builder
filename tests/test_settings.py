@@ -10,6 +10,7 @@ def required_env(monkeypatch):
     """The two settings without a default. Every Settings() needs them."""
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY", "a" * 44)
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL", "http://dp")
+    monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE", "full_view")
 
 
 @pytest.fixture

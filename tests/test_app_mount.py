@@ -16,6 +16,7 @@ def settings_env(monkeypatch):
     """Required settings plus a clean get_settings cache for every test."""
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY", "a" * 44)
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL", "http://dp")
+    monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE", "full_view")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

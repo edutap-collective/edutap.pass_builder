@@ -35,6 +35,7 @@ def get_data_provider(request: Request, settings: SettingsDep) -> DataProviderCl
         token=settings.data_provider_token.get_secret_value(),
         timeout=settings.data_provider_timeout,
         client=request.app.state.http,
+        view_type=settings.data_provider_view_type,
     )
 
 

@@ -16,6 +16,7 @@ The settings model is `edutap.pass_builder.settings.Settings`.
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL` | string | — | yes |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_TOKEN` | secret string | `""` (unset) | no |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_TIMEOUT` | float, seconds | `10.0` | no |
+| `EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE` | string | — | yes |
 | `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_BASE_URL` | string | `http://image_service:8000` | no |
 | `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_TOKEN` | secret string | `""` (unset) | no |
 | `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_TIMEOUT` | float, seconds | `10.0` | no |
@@ -86,7 +87,7 @@ image.
 An incorrect length raises `ValueError: master key must be 32 bytes
 (base64 encoded)` when the secret backend is constructed.
 
-## `DATA_PROVIDER_BASE_URL` / `DATA_PROVIDER_TOKEN` / `DATA_PROVIDER_TIMEOUT`
+## `DATA_PROVIDER_BASE_URL` / `DATA_PROVIDER_TOKEN` / `DATA_PROVIDER_TIMEOUT` / `DATA_PROVIDER_VIEW_TYPE`
 
 Configure the `httpx.AsyncClient` used to fetch person data and the field
 catalogue from `data_provider`.
@@ -95,6 +96,20 @@ your `data_provider` deployment requires bearer authentication.
 `DATA_PROVIDER_TIMEOUT` is the explicit per-request timeout in seconds; the
 render path retries once on a connection failure and never on a 4xx
 response.
+
+
+`DATA_PROVIDER_VIEW_TYPE` names which of the provider's views this service
+reads — `full_view`, `mensapass`, whatever the deployment configured on
+`edutap.data_provider`. The provider serves one view per call and refuses a
+call that names none, so this is required and has no default: the obvious
+default would be one deployment's view name, and it would make the next
+deployment fail on its first catalogue refresh instead of at startup.
+
+A request the provider *refuses* — an unknown view, a field it does not offer,
+a token it does not accept — surfaces as `data_provider_rejected` with the
+status and the provider's own title in the detail. Only a 5xx or a connection
+failure is `data_provider_unavailable`. They used to be one problem, and an
+operator reading "unavailable" went looking for an outage that was not there.
 
 ## `OBJECTSTORE_*`
 
