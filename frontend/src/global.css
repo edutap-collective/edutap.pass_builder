@@ -1,47 +1,338 @@
+/*
+ * The workspace is quiet so the passes can be loud.
+ *
+ * Everything this tool exists for ends up as a rounded, coloured rectangle on
+ * somebody's phone. So saturated colour is reserved: it belongs to the pass
+ * preview, which paints itself from the tenant's own class JSON, and to the two
+ * states an operator must never misread -- valid and broken. The chrome around
+ * it stays achromatic on purpose. A workspace that competes with its content
+ * makes colour decisions harder to judge, and judging them is the job.
+ */
+
+/*
+ * The typefaces are bundled, never fetched from a font CDN. This interface sits
+ * behind Shibboleth in a German university's administration, and a stylesheet
+ * that pulls from fonts.googleapis.com would hand every administrator's IP to a
+ * third country on page load. `@fontsource` ships the woff2 files, Vite emits
+ * them next to the bundle, and the page makes no request it did not serve.
+ *
+ * IBM Plex, one superfamily in two roles: Sans for the interface, Mono for JSON,
+ * keys and digests. Both are needed here -- a tool that shows prose and code
+ * side by side -- and taking them from one family keeps their proportions and
+ * their umlauts consistent.
+ */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+
 :root {
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  line-height: 1.5;
+  /* Near-black with a blue cast. A surface, not a tint on text: the top bar is
+     painted in it, which is what gives the chrome a horizon to sit on. */
+  --ink: #14181d;
+  --ink-soft: #232a32;
+
+  /* Cool rather than cream. Paper under daylight-balanced light, the way a
+     proofing table is lit -- so a warm pass background reads as warm. */
+  --paper: #f6f7f9;
+  --surface: #ffffff;
+  --rule: #dde1e7;
+  --muted: #5c6672;
+
+  /* Deep green for action and for "this pass is valid". Green because that is
+     what a credential says when it works, not because an interface needs an
+     accent. */
+  --signal: #0b6e4f;
+  --signal-weak: #e6f1ec;
+
+  /* Oxblood for destruction and failure. Muted: an error is information, not
+     an emergency. */
+  --alert: #a4303f;
+  --alert-weak: #f8ecee;
+
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  /* One radius for panels. The pass preview uses its own, larger one -- that
+     difference is information: it says "this is the artefact, not a panel". */
+  --radius: 4px;
+
+  --bar: 3.25rem;
+  --rail: 15rem;
+
+  color-scheme: light;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  padding: 1.5rem;
+  background: var(--paper);
 }
 
-main {
-  max-width: 60rem;
-  margin: 0 auto;
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------- shell -- */
+
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: var(--bar) 1fr;
+}
+
+.canvas {
+  display: grid;
+  /* Canvas left, index right -- the navigation the brief asked for. It works
+     because the left edge belongs to content that is read from it: JSON with
+     line numbers, lists, forms. The index is a thumb tab, consulted rather
+     than read. */
+  grid-template-columns: minmax(0, 1fr) var(--rail);
+  align-items: start;
+}
+
+.work {
+  padding: 1.75rem 2rem 4rem;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------- top bar -- */
+
+.bar {
+  background: var(--ink);
+  color: #eef1f4;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0 1.25rem 0 1.5rem;
+}
+
+.bar-mark {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  white-space: nowrap;
+}
+
+/* The glyph is a pass seen edge-on: a rounded rectangle with a strip across
+   its top third, which is the one shape both Apple and Google agree on. */
+.bar-glyph {
+  width: 1.125rem;
+  height: 1.375rem;
+  border-radius: 3px;
+  background: linear-gradient(
+    to bottom,
+    var(--signal) 0 34%,
+    #f3f5f7 34% 100%
+  );
+  align-self: center;
+  flex: none;
+}
+
+.bar-mark em {
+  font-style: normal;
+  font-weight: 400;
+  color: #98a4b0;
+}
+
+.bar-context {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.bar-context select {
+  font: inherit;
+  font-weight: 500;
+  color: #eef1f4;
+  background: var(--ink-soft);
+  border: 1px solid #38424e;
+  border-radius: var(--radius);
+  padding: 0.3rem 0.5rem;
+  max-width: 18rem;
+}
+
+/* The counts an operator needs before doing anything: what this tenant already
+   has. Tabular figures so the numbers do not jitter as they load. */
+.bar-facts {
+  display: flex;
+  gap: 1.25rem;
+  color: #b6c0ca;
+  font-size: 0.8125rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.bar-facts b {
+  color: #eef1f4;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.3rem;
+}
+
+.bar-langs {
+  display: flex;
+  gap: 0.25rem;
+  flex: none;
+}
+
+.bar-langs button {
+  font: inherit;
+  font-size: 0.8125rem;
+  color: #98a4b0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+}
+
+.bar-langs button[aria-pressed="true"] {
+  color: #eef1f4;
+  border-color: #38424e;
+  background: var(--ink-soft);
+}
+
+/* --------------------------------------------------------------- rail -- */
+
+.rail {
+  position: sticky;
+  top: var(--bar);
+  padding: 1.75rem 1.5rem 2rem 0;
+  border-left: 1px solid var(--rule);
+  min-height: calc(100vh - var(--bar));
+}
+
+.rail h2 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 0.5rem 1.5rem;
+}
+
+.rail ul {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+
+.rail button {
+  font: inherit;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  /* The 3px left edge is where the active marker goes, so every item reserves
+     it and nothing shifts when the selection moves. */
+  border-left: 3px solid transparent;
+  padding: 0.4rem 0 0.4rem 1.25rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.rail button:hover:not(:disabled) {
+  background: #eef0f3;
+}
+
+.rail button[aria-current="page"] {
+  border-left-color: var(--signal);
+  font-weight: 600;
+}
+
+.rail button:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.rail .count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+}
+
+.rail hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 0 0 1.25rem 1.25rem;
+}
+
+.rail-empty {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: 0 0 1.5rem 1.25rem;
+}
+
+/* ------------------------------------------------------------ content -- */
 
 h1 {
   font-size: 1.5rem;
-  margin-bottom: 0;
-}
-
-header p {
-  margin-top: 0.25rem;
-  opacity: 0.75;
-}
-
-nav button[aria-pressed="true"],
-.languages button[aria-pressed="true"] {
   font-weight: 600;
-  text-decoration: underline;
+  letter-spacing: -0.014em;
+  margin: 0 0 0.25rem;
 }
 
-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: flex-start;
-  margin: 0.75rem 0;
+h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 2rem 0 0.5rem;
 }
 
-textarea {
-  min-width: 24rem;
-  min-height: 6rem;
-  font-family: ui-monospace, monospace;
+h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.35rem;
+}
+
+.lede {
+  color: var(--muted);
+  max-width: 62ch;
+  margin: 0 0 1.5rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 1rem 1.125rem;
+  margin: 0 0 1.25rem;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+  gap: 1.25rem;
+  align-items: start;
 }
 
 table {
@@ -52,44 +343,123 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.35rem 0.5rem;
-  border-bottom: 1px solid rgb(128 128 128 / 0.3);
+  padding: 0.45rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+td code,
+.mono {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+/* -------------------------------------------------------------- forms -- */
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.55rem;
+}
+
+textarea {
+  min-width: 24rem;
+  min-height: 6rem;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+}
+
+button {
+  font: inherit;
+}
+
+form button,
+.action {
+  background: var(--signal);
+  color: #fff;
+  border: 1px solid var(--signal);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+form button:disabled,
+.action:disabled {
+  background: var(--rule);
+  border-color: var(--rule);
+  color: var(--muted);
+  cursor: default;
+}
+
+.quiet {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--rule);
+  font-weight: 400;
+}
+
+.destructive {
+  background: var(--surface);
+  color: var(--alert);
+  border-color: var(--alert);
 }
 
 .problem {
   white-space: pre-line;
-  color: #a11;
+  color: var(--alert);
+  background: var(--alert-weak);
+  border: 1px solid #eccfd4;
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  margin: 0.75rem 0;
 }
 
 .hint {
-  opacity: 0.75;
-  font-size: 0.9rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
 }
 
 .issued-token {
-  border: 1px solid rgb(128 128 128 / 0.5);
-  padding: 0.75rem;
+  border: 1px solid var(--signal);
+  background: var(--signal-weak);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.875rem;
   margin: 0.75rem 0;
 }
 
 .issued-token code {
   display: block;
   word-break: break-all;
-  font-family: ui-monospace, monospace;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
   margin: 0.5rem 0;
 }
 
 .variants,
 .versions {
   margin-left: 1rem;
-  padding-left: 0.75rem;
-  border-left: 2px solid rgb(128 128 128 / 0.3);
-}
-
-/* The tabs while no tenant is selected: visible, not usable. They answer the
-   question "and then what?" before anybody has to ask it. */
-nav.preview button {
-  opacity: 0.45;
+  padding-left: 1rem;
+  border-left: 2px solid var(--rule);
 }
 
 /* Scoped to the tenant form on purpose. A bare `form label` would restack every
@@ -98,11 +468,305 @@ nav.preview button {
 .tenants form label {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
 
 .tenants label > small {
   display: block;
-  opacity: 0.7;
-  font-size: 0.8rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* -------------------------------------------------------- json editor -- */
+
+/*
+ * A textarea laid exactly over its own highlighted copy. The text is written
+ * twice: once transparent and editable on top, once coloured and inert below,
+ * with identical metrics so the caret lands on the glyph a reader sees.
+ *
+ * Why not a code-editor library: the two that would do this properly are larger
+ * than this whole bundle and bring a plugin architecture, a state machine and a
+ * grammar engine to a job that is one regular expression per token kind. Sixty
+ * lines is the smaller commitment, and it only ever has to understand JSON.
+ */
+.json {
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.json-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--rule);
+  background: #fbfcfd;
+}
+
+.json-name {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.json-state {
+  font-size: 0.75rem;
+  color: var(--signal);
+}
+
+.json-state[data-broken="true"] {
+  color: var(--alert);
+}
+
+.json-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  max-height: 26rem;
+  overflow: auto;
+}
+
+.json-gutter {
+  padding: 0.6rem 0.6rem 0.6rem 0.75rem;
+  border-right: 1px solid var(--rule);
+  background: #fbfcfd;
+  color: #9aa5b1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  white-space: pre;
+}
+
+.json-code {
+  position: relative;
+  min-width: 0;
+}
+
+/* The two layers share every metric that affects where a glyph lands. Change
+   one padding here and the caret drifts away from the text under it. */
+.json-code pre,
+.json-code textarea {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+  line-height: inherit;
+  white-space: pre;
+  overflow-wrap: normal;
+  tab-size: 2;
+  border: 0;
+}
+
+.json-code pre {
+  pointer-events: none;
+  min-height: 100%;
+}
+
+.json-code textarea {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--ink);
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 0;
+}
+
+.json-code textarea:focus {
+  outline: none;
+}
+
+.json:focus-within {
+  outline: 2px solid var(--signal);
+  outline-offset: 1px;
+}
+
+.tok-key {
+  color: #1c4f8b;
+}
+
+.tok-string {
+  color: #0b6e4f;
+}
+
+.tok-number {
+  color: #8a4b12;
+}
+
+.tok-atom {
+  color: #6c3fa0;
+}
+
+.tok-punct {
+  color: #7b8794;
+}
+
+/* ------------------------------------------------------- pass preview -- */
+
+/*
+ * The one place in this interface allowed to be loud, and the one place that
+ * borrows Wallet's own conventions: the larger corner radius, the strip across
+ * the top, uppercase field labels over their values. Those are quotations, and
+ * they only make sense inside the quotation marks -- used as chrome elsewhere
+ * they would be the tell of an interface that decorates instead of describing.
+ */
+.preview-frame {
+  position: sticky;
+  top: calc(var(--bar) + 1.75rem);
+}
+
+.pass {
+  width: 100%;
+  max-width: 20rem;
+  border-radius: 10px;
+  overflow: hidden;
+  color: #fff;
+  box-shadow: 0 1px 2px rgb(20 24 29 / 0.16), 0 8px 20px rgb(20 24 29 / 0.1);
+  transition: background-color 180ms ease;
+}
+
+.pass-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  border-bottom: 1px solid rgb(255 255 255 / 0.22);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.pass-logo {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.85);
+  flex: none;
+}
+
+.pass-head {
+  padding: 0.875rem;
+}
+
+.pass-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.pass-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 0.875rem;
+  padding: 0 0.875rem 1rem;
+}
+
+.pass-field dt {
+  /* Wallet sets field labels in small uppercase. Faithful here, nowhere else. */
+  text-transform: uppercase;
+  font-size: 0.625rem;
+  letter-spacing: 0.06em;
+  opacity: 0.72;
+  margin: 0;
+}
+
+.pass-field dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.pass-code {
+  background: rgb(255 255 255 / 0.92);
+  margin: 0 0.875rem 0.875rem;
+  border-radius: 4px;
+  padding: 0.625rem;
+  text-align: center;
+}
+
+.pass-code span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.pass-bars {
+  height: 2.25rem;
+  margin-bottom: 0.375rem;
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--ink) 0 2px,
+    transparent 2px 4px,
+    var(--ink) 4px 5px,
+    transparent 5px 9px
+  );
+}
+
+.preview-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: 0.75rem 0 0;
+  max-width: 34ch;
+}
+
+.preview-empty {
+  border: 1px dashed var(--rule);
+  border-radius: 10px;
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* -------------------------------------------------------------- small -- */
+
+@media (max-width: 60rem) {
+  .canvas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rail {
+    position: static;
+    min-height: 0;
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    padding: 1.25rem 1.5rem 2rem 0;
+  }
+
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .work {
+    padding: 1.25rem 1.25rem 3rem;
+  }
+
+  .bar-facts {
+    display: none;
+  }
+}
+
+/* For labels a screen reader needs and the layout does not. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }

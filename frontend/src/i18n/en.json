@@ -39,7 +39,8 @@
     "uploadBundle": "Upload pkpasstemplate",
     "designerFiles": "Designer files (class.json, object.json, mappings.json)",
     "importDesigner": "Import from the designer",
-    "valid": "No findings"
+    "valid": "No findings",
+    "saveVersion": "Save version"
   },
   "credentials": {
     "empty": "No credentials",
@@ -82,5 +83,25 @@
     "cancel": "Cancel",
     "error": "Error",
     "close": "Close"
+  },
+  "bar": {
+    "choose": "Choose a tenant",
+    "key": "key"
+  },
+  "rail": {
+    "label": "Tenant navigation",
+    "tenant": "Tenant",
+    "pickFirst": "Choose a tenant first.",
+    "manageTenants": "Manage tenants"
+  },
+  "json": {
+    "empty": "empty",
+    "valid": "{{count}} lines, valid",
+    "broken": "not valid JSON"
+  },
+  "preview": {
+    "empty": "The preview appears once class.json or object.json parses.",
+    "noIssuer": "No issuer",
+    "note": "Drawn from the payload, not by Google. Spacing and type are this interface's; a wallet will differ in detail."
   }
 }
