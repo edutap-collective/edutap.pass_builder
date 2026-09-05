@@ -11,6 +11,9 @@ def required_env(monkeypatch):
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY", "a" * 44)
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL", "http://dp")
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE", "full_view")
+    monkeypatch.setenv(
+        "EDUTAP_PASS_BUILDER_TENANTS", '[{"key": "lmu", "name": "LMU München"}]'
+    )
 
 
 @pytest.fixture
@@ -120,3 +123,36 @@ def test_unknown_api_class_is_rejected(required_env, monkeypatch):
 def test_public_origin_is_optional(required_env):
     """Only services building absolute URLs (Apple, Google) need it."""
     assert Settings().public_origin is None
+
+
+def test_tenants_are_declared_as_json(required_env):
+    """A list of objects arrives as one JSON environment variable.
+
+    That is pydantic-settings' native form for a complex field, and it is what
+    an Ansible descriptor renders with `to_json` -- no second syntax to parse.
+    """
+    tenants = Settings().tenants
+    assert [t.key for t in tenants] == ["lmu"]
+    assert tenants[0].name == "LMU München"
+
+
+def test_tenants_are_required(required_env, monkeypatch):
+    """No declaration must abort, not start with an empty list.
+
+    An empty default would reconcile every existing tenant to inactive on the
+    first deploy that forgot the variable -- issuing stops, and the only trace
+    is a warning nobody reads at three in the morning. A missing setting fails
+    once, at startup, naming what is missing.
+    """
+    monkeypatch.delenv("EDUTAP_PASS_BUILDER_TENANTS")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_a_tenant_key_is_a_slug(required_env, monkeypatch):
+    """Keys end up in permissions (`templates:write@lmu-ub`) and in paths."""
+    monkeypatch.setenv(
+        "EDUTAP_PASS_BUILDER_TENANTS", '[{"key": "LMU Zentral", "name": "x"}]'
+    )
+    with pytest.raises(ValidationError):
+        Settings()

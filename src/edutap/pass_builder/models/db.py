@@ -97,6 +97,12 @@ class Tenant(Base, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     key: str = Field(unique=True, index=True)
     name: str
+    active: bool = True
+    """False once the tenant left the settings while it still held rows.
+
+    Never deleted: a typo in a settings file must not take four tables of rows
+    with it. Never silently kept: a tenant somebody removed on purpose must
+    stop issuing. `resolve_token` refuses a client of an inactive tenant."""
     created_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 

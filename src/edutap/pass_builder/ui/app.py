@@ -19,6 +19,7 @@ from ..auth import current_auth
 from ..errors import install_error_handlers
 from ..routers import audit, credentials, fields, health, templates
 from ..settings import get_settings
+from ..startup import reconcile_declared_tenants
 from .auth import tenant_path_parameter, ui_auth_context
 from .routers import tenants
 
@@ -61,6 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     catalogue export and the Google class push both talk HTTP, and a pool per
     request is a pool that never warms up.
     """
+    await reconcile_declared_tenants()
     async with httpx.AsyncClient() as http:
         app.state.http = http
         yield

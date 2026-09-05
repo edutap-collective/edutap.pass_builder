@@ -57,6 +57,9 @@ os.environ.setdefault(
     "EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL", "http://data-provider.invalid"
 )
 os.environ.setdefault("EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE", "full_view")
+os.environ.setdefault(
+    "EDUTAP_PASS_BUILDER_TENANTS", '[{"key": "lmu", "name": "LMU München"}]'
+)
 
 
 @pytest.fixture(autouse=True)

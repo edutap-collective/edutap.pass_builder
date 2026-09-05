@@ -17,6 +17,9 @@ def settings_env(monkeypatch):
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_SECRET_MASTER_KEY", "a" * 44)
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_BASE_URL", "http://dp")
     monkeypatch.setenv("EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE", "full_view")
+    monkeypatch.setenv(
+        "EDUTAP_PASS_BUILDER_TENANTS", '[{"key": "lmu", "name": "LMU München"}]'
+    )
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

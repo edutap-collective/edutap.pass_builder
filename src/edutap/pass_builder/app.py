@@ -18,6 +18,7 @@ from .dependencies import get_objectstore
 from .errors import install_error_handlers
 from .routers import audit, credentials, fields, health, passes, templates
 from .settings import get_settings
+from .startup import reconcile_declared_tenants
 
 SERVICE_NAME = "edutap.pass_builder"
 """The name telemetry travels under: the distribution name.
@@ -90,6 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     if exports_to_a_collector():
         instrument_fastapi_safely(app, observability)
 
+    await reconcile_declared_tenants()
     async with httpx.AsyncClient() as http:
         app.state.http = http
         objectstore = get_objectstore(get_settings())

@@ -1,10 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { client, problemText } from "../api/client";
 
-type Tenant = { id: string; key: string; name: string };
+type Tenant = { id: string; key: string; name: string; active: boolean };
 
 export function useTenants() {
   return useQuery({
@@ -18,7 +17,13 @@ export function useTenants() {
 }
 
 /**
- * Picks the tenant every other view works in, and creates the first one.
+ * Picks the tenant every other view works in.
+ *
+ * It no longer creates one. Tenants are declared in the service's settings and
+ * reconciled at startup: a tenant is deployment topology, not something an
+ * operator types into a form on a Tuesday. What this shows is the outcome of
+ * that reconciliation -- including a tenant that left the settings while it
+ * still held rows, which stays listed, marked inactive, and cannot be chosen.
  *
  * The tenant lives in the path rather than in the caller, because a person is
  * not bound to one the way an API token is. Which also means it has to be
@@ -32,26 +37,7 @@ export function Tenants({
   onSelect: (id: string) => void;
 }) {
   const { t } = useTranslation();
-  const queryClient = useQueryClient();
   const tenants = useTenants();
-  const [key, setKey] = useState("");
-  const [name, setName] = useState("");
-
-  const create = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await client.POST("/api/v1/tenants", {
-        body: { key, name },
-      });
-      if (error) throw error;
-      return data as Tenant;
-    },
-    onSuccess: (tenant) => {
-      setKey("");
-      setName("");
-      void queryClient.invalidateQueries({ queryKey: ["tenants"] });
-      onSelect(tenant.id);
-    },
-  });
 
   if (tenants.isLoading) return <p>{t("common.loading")}</p>;
 
@@ -79,45 +65,14 @@ export function Tenants({
         >
           <option value="">{t("tenant.none")}</option>
           {(tenants.data ?? []).map((tenant) => (
-            <option key={tenant.id} value={tenant.id}>
+            <option key={tenant.id} value={tenant.id} disabled={!tenant.active}>
               {tenant.name} ({tenant.key})
+              {tenant.active ? "" : ` — ${t("tenant.inactive")}`}
             </option>
           ))}
         </select>
       </label>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          create.mutate();
-        }}
-      >
-        <label>
-          {t("tenant.key")}
-          <input
-            placeholder={t("tenant.keyExample")}
-            value={key}
-            onChange={(event) => setKey(event.target.value)}
-            required
-          />
-          <small>{t("tenant.keyHint")}</small>
-        </label>
-        <label>
-          {t("tenant.name")}
-          <input
-            placeholder={t("tenant.nameExample")}
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-          />
-          <small>{t("tenant.nameHint")}</small>
-        </label>
-        <button type="submit" disabled={create.isPending}>
-          {t("tenant.create")}
-        </button>
-      </form>
-
-      {create.error ? <Problem error={create.error} /> : null}
     </div>
   );
 }
