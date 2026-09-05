@@ -44,3 +44,10 @@ explanation/why-stateless
 explanation/why-placeholders
 explanation/why-immutable-versions
 ```
+
+```{toctree}
+:maxdepth: 2
+:caption: Decisions
+
+adr/0001-administration-moves-out-of-this-service
+```

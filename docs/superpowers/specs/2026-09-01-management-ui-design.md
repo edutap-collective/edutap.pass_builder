@@ -1,3 +1,15 @@
+> **Superseded on 2026-09-05 by
+> [`docs/adr/0001-administration-moves-out-of-this-service.md`](../../adr/0001-administration-moves-out-of-this-service.md).**
+>
+> Administration moves to a separate product, `edutap.admin_ui`, over each
+> service's admin API. Nothing below this line has been changed: it records what
+> was decided on 2026-09-01 and why, and both of its findings were correct at
+> that date. What removed them was the question growing past this one service,
+> and tenants and administrators moving into configuration. The ADR names both.
+>
+> This banner is here so that nobody reads the document below, finds it
+> convincing, and builds the next interface into this service again.
+
 # Design: A management UI inside the pass builder
 
 **Date:** 2026-09-01
