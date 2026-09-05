@@ -190,6 +190,7 @@ async def e2e_env(session) -> AsyncGenerator[E2eEnv]:
             token="",
             timeout=5.0,
             client=http_client,
+            view_type="full_view",
         )
         render_service = RenderService(
             session,

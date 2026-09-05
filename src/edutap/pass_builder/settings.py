@@ -111,6 +111,19 @@ class Settings(BaseSettings):
     data_provider_base_url: str
     data_provider_token: SecretStr = SecretStr("")
     data_provider_timeout: float = 10.0
+    data_provider_view_type: str
+    """Which of the provider's views this service reads, e.g. `full_view`.
+
+    REQUIRED, WITH NO DEFAULT, on purpose. The obvious default -- `full_view`
+    -- is the name of one deployment's view and would make the next deployment
+    fail on its first catalogue refresh instead of at startup, with a 404 from
+    a service that is perfectly healthy. A missing setting fails here, once,
+    with the name of what is missing.
+
+    Deployment-wide today. The 2026-09-05 design puts the view on the template
+    and the connection on the tenant; this becomes the default that the
+    template's value overrides.
+    """
 
     image_service_base_url: str = "http://image_service:8000"
     """Where an `IMAGE` mapping rule's reference is fetched from.
