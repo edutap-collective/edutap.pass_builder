@@ -192,6 +192,13 @@ export function App() {
       <TopBar tenantId={tenantId} onSelect={setTenantId} />
 
       <div className="canvas">
+        <Rail
+          tenantId={tenantId}
+          section={section}
+          onSelect={setSection}
+          onTenants={() => setTenantId(null)}
+        />
+
         <main className="work">
           {tenantId ? (
             <>
@@ -210,13 +217,6 @@ export function App() {
             </>
           )}
         </main>
-
-        <Rail
-          tenantId={tenantId}
-          section={section}
-          onSelect={setSection}
-          onTenants={() => setTenantId(null)}
-        />
       </div>
     </div>
   );

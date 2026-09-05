@@ -10,22 +10,23 @@
  */
 
 /*
- * The typefaces are bundled, never fetched from a font CDN. This interface sits
- * behind Shibboleth in a German university's administration, and a stylesheet
- * that pulls from fonts.googleapis.com would hand every administrator's IP to a
- * third country on page load. `@fontsource` ships the woff2 files, Vite emits
- * them next to the bundle, and the page makes no request it did not serve.
+ * NO WEBFONT. The families below are whatever the reader's system already has.
  *
- * IBM Plex, one superfamily in two roles: Sans for the interface, Mono for JSON,
- * keys and digests. Both are needed here -- a tool that shows prose and code
- * side by side -- and taking them from one family keeps their proportions and
- * their umlauts consistent.
+ * A bundled face was here for one commit and is gone again, because it never
+ * had a case: 28 woff2 files and 412 KB -- `@fontsource` ships every subset per
+ * weight, so Cyrillic and Vietnamese travelled to an interface used by a handful
+ * of people in Munich. A back-office tool has no brand to carry to strangers; it
+ * has operators who want it to open.
+ *
+ * Loading them from a font CDN would have been worse than the weight. This
+ * interface sits behind Shibboleth in a German university's administration, and
+ * a stylesheet reaching fonts.googleapis.com hands every administrator's IP to a
+ * third country on page load.
+ *
+ * What carried the typography was never the family. It was the scale, the
+ * weights, the tabular figures in the counts and the mono/sans split -- and all
+ * of that survives a system stack.
  */
-@import "@fontsource/ibm-plex-sans/400.css";
-@import "@fontsource/ibm-plex-sans/500.css";
-@import "@fontsource/ibm-plex-sans/600.css";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
 
 :root {
   /* Near-black with a blue cast. A surface, not a tint on text: the top bar is
@@ -51,8 +52,10 @@
   --alert: #a4303f;
   --alert-weak: #f8ecee;
 
-  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* The JSON editor lays a textarea over its own highlighted copy, so what
+     matters is that both layers resolve to the SAME face -- not which one. */
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* One radius for panels. The pass preview uses its own, larger one -- that
      difference is information: it says "this is the artefact, not a panel". */
@@ -105,11 +108,14 @@ body {
 
 .canvas {
   display: grid;
-  /* Canvas left, index right -- the navigation the brief asked for. It works
-     because the left edge belongs to content that is read from it: JSON with
-     line numbers, lists, forms. The index is a thumb tab, consulted rather
-     than read. */
-  grid-template-columns: minmax(0, 1fr) var(--rail);
+  /* Navigation left, canvas right. It stood on the right for one commit, and
+     the argument for it -- an index is consulted rather than read -- was a
+     reasonable one about a different kind of interface. This is not one: it is
+     a back office where people move between four places all day, and every
+     tool they already have in front of them puts that column on the left. An
+     interface that is unusual in its navigation spends the operator's
+     attention on itself. */
+  grid-template-columns: var(--rail) minmax(0, 1fr);
   align-items: start;
 }
 
@@ -225,8 +231,8 @@ body {
 .rail {
   position: sticky;
   top: var(--bar);
-  padding: 1.75rem 1.5rem 2rem 0;
-  border-left: 1px solid var(--rule);
+  padding: 1.75rem 0 2rem;
+  border-right: 1px solid var(--rule);
   min-height: calc(100vh - var(--bar));
 }
 
@@ -235,6 +241,7 @@ body {
   font-weight: 600;
   color: var(--muted);
   margin: 0 0 0.5rem 1.5rem;
+  padding-right: 1.5rem;
 }
 
 .rail ul {
@@ -256,7 +263,7 @@ body {
   /* The 3px left edge is where the active marker goes, so every item reserves
      it and nothing shifts when the selection moves. */
   border-left: 3px solid transparent;
-  padding: 0.4rem 0 0.4rem 1.25rem;
+  padding: 0.4rem 1.5rem 0.4rem 1.25rem;
   color: var(--ink);
   cursor: pointer;
 }
@@ -284,13 +291,13 @@ body {
 .rail hr {
   border: 0;
   border-top: 1px solid var(--rule);
-  margin: 0 0 1.25rem 1.25rem;
+  margin: 0 1.5rem 1.25rem;
 }
 
 .rail-empty {
   color: var(--muted);
   font-size: 0.8125rem;
-  margin: 0 0 1.5rem 1.25rem;
+  margin: 0 1.5rem 1.5rem 1.25rem;
 }
 
 /* ------------------------------------------------------------ content -- */
@@ -740,9 +747,9 @@ form button:disabled,
   .rail {
     position: static;
     min-height: 0;
-    border-left: 0;
-    border-top: 1px solid var(--rule);
-    padding: 1.25rem 1.5rem 2rem 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 1rem 0;
   }
 
   .split {
