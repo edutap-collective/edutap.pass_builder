@@ -6,12 +6,14 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     ARRAY,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
     Index,
     String,
     UniqueConstraint,
+    true,
 )
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.dialects.postgresql import JSONB
@@ -97,12 +99,24 @@ class Tenant(Base, table=True):
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     key: str = Field(unique=True, index=True)
     name: str
-    active: bool = True
+    active: bool = Field(
+        default=True,
+        sa_column=Column(Boolean, nullable=False, server_default=true()),
+    )
     """False once the tenant left the settings while it still held rows.
 
     Never deleted: a typo in a settings file must not take four tables of rows
     with it. Never silently kept: a tenant somebody removed on purpose must
-    stop issuing. `resolve_token` refuses a client of an inactive tenant."""
+    stop issuing. `resolve_token` refuses a client of an inactive tenant.
+
+    THE SERVER DEFAULT IS LOAD-BEARING, and a Python default alone was measured
+    to break the production deploy. `edutap-dbdef` renders this column from the
+    metadata, not from the Alembic history -- that is the path production
+    migrates on -- and without `server_default` it emitted
+    `ADD COLUMN active BOOLEAN NOT NULL` with no DEFAULT. On a table that already
+    held the `lmu` row that is a NotNullViolation, and the deploy stops there.
+    Alembic 0004 carried the default; the metadata did not; the two paths had
+    diverged and only one of them is what production runs."""
     created_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
 
 
