@@ -106,6 +106,15 @@ call that names none, so this is required and has no default: the obvious
 default would be one deployment's view name, and it would make the next
 deployment fail on its first catalogue refresh instead of at startup.
 
+`DATA_PROVIDER_VIEW_TYPE` is the deployment's **default** view. A template may
+name its own: `template.view_type`, set when creating or patching a template,
+is sent on every lookup for a pass built from it. Three tenants issue three
+passes from one provider, and they do not read the same view — the student
+card reads `full_view`, the canteen pass reads `mensapass`. A template without a
+view reads the default; the setting decides nothing for a template that names
+one. The field catalogue shown in the management interface still uses the
+default view.
+
 A request the provider *refuses* — an unknown view, a field it does not offer,
 a token it does not accept — surfaces as `data_provider_rejected` with the
 status and the provider's own title in the detail. Only a 5xx or a connection

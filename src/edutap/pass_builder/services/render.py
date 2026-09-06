@@ -637,7 +637,9 @@ class RenderService:
                 auth.tenant_id, template_key, wallet_type, variant_key, version_number
             )
             fields = required_fields(spec.rules)
-            data = await self._data_provider.fetch_fields(person_uid, fields)
+            data = await self._data_provider.fetch_fields(
+                person_uid, fields, view_type=template.view_type
+            )
             bound = self._bind_or_raise(spec.rules, data)
 
             result = await self._build_and_deliver(

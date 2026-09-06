@@ -69,7 +69,9 @@ _WWDR_B = _FIXTURES_DIR / "apple_cert.pem"
 class FakeDataProvider:
     """Returns a fixed sample person for every lookup."""
 
-    async def fetch_fields(self, person_uid: str, fields: list[str]) -> dict:
+    async def fetch_fields(
+        self, person_uid: str, fields: list[str], *, view_type: str | None = None
+    ) -> dict:
         return {"person.name": "Ada Lovelace"}
 
 

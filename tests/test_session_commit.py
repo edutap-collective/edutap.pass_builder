@@ -66,7 +66,9 @@ class _FakeObjectStore:
 class _FakeDataProvider:
     """Placeholder; the render path here fails before any fetch happens."""
 
-    async def fetch_fields(self, person_uid: str, fields: list[str]) -> dict:
+    async def fetch_fields(
+        self, person_uid: str, fields: list[str], *, view_type: str | None = None
+    ) -> dict:
         raise AssertionError("not expected to be called in this module")
 
 

@@ -611,3 +611,36 @@ async def test_variant_sync_rejects_non_google_variant_before_decrypting(
     )
     assert response.status_code == 400
     assert response.json()["type"].endswith("not_a_google_variant")
+
+
+async def test_a_template_carries_its_view(client, session):
+    """`view_type` is part of the template, round-trips, and can be changed.
+
+    It is optional: a template without one reads the deployment's default view.
+    """
+    manager = await seed_client(session, [Scope.MANAGE])
+
+    created = await client.post(
+        f"{API_PREFIX}/templates",
+        json={"key": "mensa", "name": "Mensapass", "view_type": "mensapass"},
+        headers=manager.headers,
+    )
+    assert created.status_code == 201
+    assert created.json()["view_type"] == "mensapass"
+    template_id = created.json()["id"]
+
+    patched = await client.patch(
+        f"{API_PREFIX}/templates/{template_id}",
+        json={"view_type": "full_view"},
+        headers=manager.headers,
+    )
+    assert patched.status_code == 200
+    assert patched.json()["view_type"] == "full_view"
+
+    plain = await client.post(
+        f"{API_PREFIX}/templates",
+        json={"key": "esc", "name": "Student card"},
+        headers=manager.headers,
+    )
+    assert plain.status_code == 201
+    assert plain.json()["view_type"] is None

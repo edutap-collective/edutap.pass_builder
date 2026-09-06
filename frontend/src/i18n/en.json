@@ -36,7 +36,9 @@
     "designerFiles": "Designer files (class.json, object.json, mappings.json)",
     "importDesigner": "Import from the designer",
     "valid": "No findings",
-    "saveVersion": "Save version"
+    "saveVersion": "Save version",
+    "view": "Data view",
+    "viewHint": "Which of the data provider's views this pass reads. Leave empty for the deployment's default."
   },
   "credentials": {
     "empty": "No credentials",

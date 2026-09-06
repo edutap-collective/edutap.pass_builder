@@ -67,3 +67,17 @@ def test_tenant_active_has_a_server_default():
         "dbdef would render NOT NULL without DEFAULT"
     )
     assert column.nullable is False
+
+
+def test_template_view_type_is_nullable():
+    """NULL means "the deployment's default view", and it has to be NULL.
+
+    A NOT NULL column with no server default cannot be added to a table that
+    holds rows -- that is exactly what broke `tenant.active` on 2026-09-06 --
+    and a server default here would silently pin every existing template to
+    one named view. Nullable, no default: existing templates keep reading what
+    they read today, and only a template that names a view changes anything.
+    """
+    column = Template.__table__.c.view_type  # ty: ignore[unresolved-attribute]
+    assert column.nullable is True
+    assert column.server_default is None
