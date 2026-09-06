@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import select
 from starlette.requests import Request
 from tests.dbschema import create_schema_and_tables
 
@@ -136,3 +137,20 @@ async def test_inactive_client_is_unauthenticated(session):
         await current_auth(request, session)
     assert excinfo.value.status == 401
     assert excinfo.value.slug == "unauthenticated"
+
+
+async def test_a_token_of_an_inactive_tenant_is_refused(session):
+    """An undeclared tenant stops issuing -- that is what "inactive" is for.
+
+    The token itself is still active; it is the tenant behind it that was
+    taken out of the declaration. Refusing here, at the one place a caller is
+    established, is what makes the deactivation mean something.
+    """
+    token = await seed(session)
+    tenant = (await session.execute(select(Tenant))).scalar_one()
+    tenant.active = False
+    await session.flush()
+    with pytest.raises(ProblemError) as excinfo:
+        await resolve_token(session, token)
+    assert excinfo.value.status == 403
+    assert excinfo.value.slug == "tenant_inactive"

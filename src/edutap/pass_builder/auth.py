@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .database import get_session
 from .errors import ProblemError
-from .models.db import ApiClient
+from .models.db import ApiClient, Tenant
 from .models.enums import Scope
 
 
@@ -56,6 +56,18 @@ async def resolve_token(session: AsyncSession, token: str) -> AuthContext:
     ).scalar_one_or_none()
     if row is None:
         raise ProblemError(401, "unauthenticated", "Unknown or inactive token")
+    # The token is fine; it is the tenant behind it that may have left the
+    # settings. Refusing here, at the one place a caller is established, is what
+    # makes "inactive" mean something -- see services/tenants.py.
+    tenant_active = (
+        await session.execute(
+            # SQLModel columns read as plain Python types to ty, like the
+            # ApiClient comparisons above -- same reason, same ignore.
+            select(Tenant.active).where(Tenant.id == row.tenant_id)  # ty: ignore[no-matching-overload]
+        )
+    ).scalar_one()
+    if not tenant_active:
+        raise ProblemError(403, "tenant_inactive", "This tenant is inactive")
     return AuthContext(
         client_id=row.id, tenant_id=row.tenant_id, scopes=set(row.scopes)
     )

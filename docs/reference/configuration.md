@@ -17,6 +17,7 @@ The settings model is `edutap.pass_builder.settings.Settings`.
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_TOKEN` | secret string | `""` (unset) | no |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_TIMEOUT` | float, seconds | `10.0` | no |
 | `EDUTAP_PASS_BUILDER_DATA_PROVIDER_VIEW_TYPE` | string | — | yes |
+| `EDUTAP_PASS_BUILDER_TENANTS` | JSON list of `{key, name}` | — | yes |
 | `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_BASE_URL` | string | `http://image_service:8000` | no |
 | `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_TOKEN` | secret string | `""` (unset) | no |
 | `EDUTAP_PASS_BUILDER_IMAGE_SERVICE_TIMEOUT` | float, seconds | `10.0` | no |
@@ -110,6 +111,32 @@ a token it does not accept — surfaces as `data_provider_rejected` with the
 status and the provider's own title in the detail. Only a 5xx or a connection
 failure is `data_provider_unavailable`. They used to be one problem, and an
 operator reading "unavailable" went looking for an outage that was not there.
+
+
+## `TENANTS`
+
+The tenants this deployment runs, as one JSON value:
+
+```
+EDUTAP_PASS_BUILDER_TENANTS='[{"key": "lmu", "name": "LMU München"},
+                             {"key": "lmu-ub", "name": "Universitätsbibliothek"}]'
+```
+
+The settings are the truth and the table follows: at startup every replica
+reconciles the declaration into `tenant` under an advisory lock — creating what
+is missing, overwriting names, and marking inactive what holds rows but is no
+longer declared. An inactive tenant is never deleted (a typo must not take four
+tables of rows with it) and never silently kept (a tenant removed on purpose
+must stop issuing): its API clients are refused with `403 tenant_inactive`, and
+the management interface lists it greyed out.
+
+Required, with no default. An empty default would set every existing tenant
+inactive on the first deploy that forgot the variable, and the only trace would
+be a warning nobody reads at three in the morning. A missing setting fails once,
+at startup, naming what is missing.
+
+`key` is a lower-case slug (`^[a-z0-9][a-z0-9-]{0,62}$`): it ends up in
+permissions and in paths, so it has the character set of both.
 
 ## `OBJECTSTORE_*`
 

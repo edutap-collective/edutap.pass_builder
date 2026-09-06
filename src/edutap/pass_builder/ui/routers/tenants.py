@@ -12,7 +12,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth import hash_token
@@ -33,19 +32,13 @@ decides to.
 """
 
 
-class TenantIn(BaseModel):
-    """A tenant to create."""
-
-    key: str = Field(min_length=1, max_length=64)
-    name: str = Field(min_length=1, max_length=255)
-
-
 class TenantOut(BaseModel):
     """A tenant as the UI shows it."""
 
     id: UUID
     key: str
     name: str
+    active: bool
 
 
 class ApiClientIn(BaseModel):
@@ -92,27 +85,11 @@ async def list_tenants(
     return list(rows)
 
 
-@router.post("/tenants", response_model=TenantOut, status_code=201)
-async def create_tenant(
-    body: TenantIn,
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-    principal: Principal = Depends(require_principal()),  # noqa: B008
-) -> Tenant:
-    """Create a tenant.
-
-    A duplicate key is a 409 rather than an integrity error reaching the
-    client: `Tenant.key` is unique, and re-creating one is a plausible mistake
-    rather than a broken request.
-    """
-    tenant = Tenant(key=body.key, name=body.name)
-    session.add(tenant)
-    try:
-        await session.flush()
-    except IntegrityError as exc:
-        raise ProblemError(
-            409, "tenant_exists", f"A tenant with key {body.key!r} already exists"
-        ) from exc
-    return tenant
+# THERE IS NO POST /tenants ANY MORE. Tenants are declared in settings and
+# reconciled at startup (services/tenants.py). Creating one here would put the
+# list in two places, and two places holding one list is how the lists drift.
+# The form that used to call this is gone from the interface for the same
+# reason.
 
 
 @router.get("/tenants/{tenant_id}/clients", response_model=list[ApiClientOut])

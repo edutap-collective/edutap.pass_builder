@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 from edutap.db_definitions.settings import ASYNC_DRIVER, ClusterSettings
-from pydantic import HttpUrl, SecretStr
+from pydantic import BaseModel, Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 SECRETS_DIR = "/run/secrets"
@@ -95,6 +95,15 @@ class DatabaseSettings(ClusterSettings):
         return self.async_url.replace("%", "%%")
 
 
+class DeclaredTenant(BaseModel):
+    """One tenant as the settings declare it."""
+
+    key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,62}$")
+    """Lower-case slug. It ends up in permissions (`templates:write@lmu-ub`)
+    and in paths, so it has the character set of both."""
+    name: str = Field(min_length=1)
+
+
 class Settings(BaseSettings):
     """Configuration for the pass builder service."""
 
@@ -123,6 +132,24 @@ class Settings(BaseSettings):
     Deployment-wide today. The 2026-09-05 design puts the view on the template
     and the connection on the tenant; this becomes the default that the
     template's value overrides.
+    """
+
+    tenants: list[DeclaredTenant]
+    """The tenants this deployment runs, declared here and reconciled at startup.
+
+    REQUIRED, WITH NO DEFAULT. An empty default would reconcile every existing
+    tenant to inactive on the first deploy that forgot the variable -- issuing
+    stops, and the only trace is a warning nobody reads at three in the
+    morning. A missing setting fails once, at startup, naming what is missing.
+
+    One JSON value: `[{"key": "lmu", "name": "LMU München"}, ...]`. That is
+    pydantic-settings' native form for a list of objects, and what an Ansible
+    descriptor renders with `to_json`.
+
+    A tenant is deployment topology, not runtime data. Three of them, changing
+    almost never, and already named by the permission map -- two places holding
+    one list is how the lists drift. The table keeps existing for the foreign
+    keys underneath it; see `services/tenants.py`.
     """
 
     image_service_base_url: str = "http://image_service:8000"

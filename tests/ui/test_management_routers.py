@@ -8,13 +8,13 @@ from .conftest import AUTHORISED
 from .test_tenants import make_tenant
 
 
-async def test_a_template_is_created_through_the_reused_router(ui):
+async def test_a_template_is_created_through_the_reused_router(ui, session):
     """`routers/templates.create_template`, mounted under a tenant path.
 
     Nothing about it was rewritten for the UI -- the same body, the same
     service call, the same 201.
     """
-    tenant = await make_tenant(ui)
+    tenant = await make_tenant(ui, session)
 
     response = await ui.post(
         f"/tenants/{tenant['id']}/templates",
@@ -33,7 +33,7 @@ async def test_the_audit_entry_names_the_person(ui, session):
     have been recorded with no actor at all -- and a NULL there reads exactly
     like an entry whose actor was never captured.
     """
-    tenant = await make_tenant(ui)
+    tenant = await make_tenant(ui, session)
     response = await ui.post(
         f"/tenants/{tenant['id']}/credentials",
         json={

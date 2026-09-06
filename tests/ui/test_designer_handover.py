@@ -56,7 +56,7 @@ async def test_the_designers_three_files_go_in_without_translation(ui, session):
     payloads -- its README says the mapping file is "the shape
     `edutap.pass_builder` already defines", and this is what holds it to that.
     """
-    tenant = await make_tenant(ui)
+    tenant = await make_tenant(ui, session)
     variant_id = await _google_variant(ui, tenant["id"])
     session.add(
         DataField(
@@ -93,7 +93,7 @@ async def test_the_catalogue_export_has_the_shape_the_designer_loads(ui, session
     validates every mapping rule against one. Two files means a rule authored
     in the designer fails at publish time, and nothing before that says why.
     """
-    tenant = await make_tenant(ui)
+    tenant = await make_tenant(ui, session)
     session.add(
         DataField(
             key="person.photo",
