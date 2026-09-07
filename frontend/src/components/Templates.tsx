@@ -8,7 +8,12 @@ import { JsonEditor } from "./JsonEditor";
 import { PassPreview } from "./PassPreview";
 import { Problem } from "./Tenants";
 
-type Template = { id: string; key: string; name: string; view_type: string | null };
+type Template = {
+  id: string;
+  key: string;
+  name: string;
+  view_type: string | null;
+};
 type Variant = {
   id: string;
   key: string;
@@ -29,9 +34,12 @@ export function Templates({ tenantId }: { tenantId: string }) {
   const templates = useQuery({
     queryKey: ["templates", tenantId],
     queryFn: async () => {
-      const { data, error } = await client.GET("/api/v1/tenants/{tenant_id}/templates", {
-        params: { path: { tenant_id: tenantId } },
-      });
+      const { data, error } = await client.GET(
+        "/api/v1/tenants/{tenant_id}/templates",
+        {
+          params: { path: { tenant_id: tenantId } },
+        },
+      );
       if (error) throw error;
       return (data ?? []) as Template[];
     },
@@ -39,10 +47,13 @@ export function Templates({ tenantId }: { tenantId: string }) {
 
   const create = useMutation({
     mutationFn: async () => {
-      const { data, error } = await client.POST("/api/v1/tenants/{tenant_id}/templates", {
-        params: { path: { tenant_id: tenantId } },
-        body: { key, name, view_type: viewType.trim() || null },
-      });
+      const { data, error } = await client.POST(
+        "/api/v1/tenants/{tenant_id}/templates",
+        {
+          params: { path: { tenant_id: tenantId } },
+          body: { key, name, view_type: viewType.trim() || null },
+        },
+      );
       if (error) throw error;
       return data as Template;
     },
@@ -100,16 +111,13 @@ export function Templates({ tenantId }: { tenantId: string }) {
           {templates.data.map((template) => (
             <li key={template.id}>
               <button
-                onClick={() => setOpen(open === template.id ? null : template.id)}
+                onClick={() =>
+                  setOpen(open === template.id ? null : template.id)
+                }
               >
                 {template.name} (<code>{template.key}</code>)
-                {template.view_type ? (
-                  <>
-                    {" "}
-                    <code className="hint">{template.view_type}</code>
-                  </>
-                ) : null}
               </button>
+              <ViewField tenantId={tenantId} template={template} />
               {open === template.id ? (
                 <Variants tenantId={tenantId} templateId={template.id} />
               ) : null}
@@ -120,6 +128,74 @@ export function Templates({ tenantId }: { tenantId: string }) {
         <p>{t("templates.empty")}</p>
       )}
     </section>
+  );
+}
+
+/**
+ * The view of a template that already exists, editable in place.
+ *
+ * The create form has carried the field since the view became the template's;
+ * the list had none. Whoever forgot it on creation could not reach it again
+ * from the interface -- and the first production template was created exactly
+ * like that, reading `full_view` instead of `mensapass`. Beside the row rather
+ * than inside its toggle button: a form inside a button is not HTML.
+ *
+ * Empty saves NULL, which means the deployment's default view -- not an empty
+ * string sent to the provider, which it would refuse.
+ */
+function ViewField({
+  tenantId,
+  template,
+}: {
+  tenantId: string;
+  template: Template;
+}) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [value, setValue] = useState(template.view_type ?? "");
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await client.PATCH(
+        "/api/v1/tenants/{tenant_id}/templates/{template_id}",
+        {
+          params: { path: { tenant_id: tenantId, template_id: template.id } },
+          body: { view_type: value.trim() || null },
+        },
+      );
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["templates", tenantId] }),
+  });
+
+  return (
+    <form
+      className="view-field"
+      onSubmit={(event) => {
+        event.preventDefault();
+        save.mutate();
+      }}
+    >
+      <input
+        aria-label={`${t("templates.view")} · ${template.key}`}
+        placeholder={t("templates.view")}
+        title={t("templates.viewHint")}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      <button
+        type="submit"
+        className="quiet"
+        disabled={
+          save.isPending || (value.trim() || null) === template.view_type
+        }
+      >
+        {`${t("templates.saveView")} · ${template.key}`}
+      </button>
+      {save.error ? <Problem error={save.error} /> : null}
+    </form>
   );
 }
 
@@ -179,7 +255,9 @@ function Variants({
     },
     onSuccess: () => {
       setName("");
-      void queryClient.invalidateQueries({ queryKey: ["variants", templateId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["variants", templateId],
+      });
     },
   });
 
@@ -230,7 +308,13 @@ function Variants({
   );
 }
 
-function Versions({ tenantId, variant }: { tenantId: string; variant: Variant }) {
+function Versions({
+  tenantId,
+  variant,
+}: {
+  tenantId: string;
+  variant: Variant;
+}) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [findings, setFindings] = useState<string[] | null>(null);
@@ -289,7 +373,9 @@ function Versions({ tenantId, variant }: { tenantId: string; variant: Variant })
       {publish.error ? <Problem error={publish.error} /> : null}
       {findings ? (
         <p role="status">
-          {findings.length ? `• ${findings.join("\n• ")}` : t("templates.valid")}
+          {findings.length
+            ? `• ${findings.join("\n• ")}`
+            : t("templates.valid")}
         </p>
       ) : null}
 
@@ -418,7 +504,10 @@ function VersionUpload({
   }
 
   const ready =
-    classText.trim() !== "" && objectText.trim() !== "" && parses(classText) && parses(objectText);
+    classText.trim() !== "" &&
+    objectText.trim() !== "" &&
+    parses(classText) &&
+    parses(objectText);
 
   return (
     <div className="upload">
@@ -506,7 +595,8 @@ export async function readDesignerTrio(files: FileList | File[]): Promise<{
   rules: RuleSpec[] | null;
 }> {
   const byName = new Map<string, File>();
-  for (const file of Array.from(files)) byName.set(file.name.toLowerCase(), file);
+  for (const file of Array.from(files))
+    byName.set(file.name.toLowerCase(), file);
 
   const read = async (name: string) => {
     const file = byName.get(name);
@@ -521,7 +611,6 @@ export async function readDesignerTrio(files: FileList | File[]): Promise<{
   const mappings = await read("mappings.json");
   return { classJson, objectJson, rules: mappings?.rules ?? null };
 }
-
 
 /** True when the text is JSON a server would accept. */
 function parses(source: string): boolean {

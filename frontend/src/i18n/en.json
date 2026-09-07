@@ -38,7 +38,8 @@
     "valid": "No findings",
     "saveVersion": "Save version",
     "view": "Data view",
-    "viewHint": "Which of the data provider's views this pass reads. Leave empty for the deployment's default."
+    "viewHint": "Which of the data provider's views this pass reads. Leave empty for the deployment's default.",
+    "saveView": "Save view"
   },
   "credentials": {
     "empty": "No credentials",
