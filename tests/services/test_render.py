@@ -69,9 +69,13 @@ class FakeDataProvider:
     def __init__(self, response: dict[str, Any] | None = None) -> None:
         self.response: dict[str, Any] = {} if response is None else response
         self.last_fields: list[str] | None = None
+        self.last_view_type: str | None = None
 
-    async def fetch_fields(self, person_uid: str, fields: list[str]) -> dict[str, Any]:
+    async def fetch_fields(
+        self, person_uid: str, fields: list[str], *, view_type: str | None = None
+    ) -> dict[str, Any]:
         self.last_fields = fields
+        self.last_view_type = view_type
         return self.response
 
 
@@ -138,9 +142,13 @@ async def _seed_tenant_and_client(session) -> tuple[Tenant, ApiClient]:
     return tenant, api_client
 
 
-async def _seed_published_apple_template(session, tenant_id: UUID) -> TemplateVariant:
+async def _seed_published_apple_template(
+    session, tenant_id: UUID, *, view_type: str | None = None
+) -> TemplateVariant:
     """One published Apple template/variant/version, one rule: person.name."""
-    template = Template(tenant_id=tenant_id, key="student-id", name="Student ID")
+    template = Template(
+        tenant_id=tenant_id, key="student-id", name="Student ID", view_type=view_type
+    )
     session.add(template)
     await session.flush()
 
@@ -1006,3 +1014,57 @@ async def test_credential_from_other_tenant_is_not_used(session):
 
     assert excinfo.value.status == 404
     assert excinfo.value.slug == "credential_not_found"
+
+
+async def test_a_template_names_the_view_its_data_comes_from(session):
+    """The view is the template's, not the deployment's.
+
+    Three tenants, three passes, one data provider: the student card reads
+    `full_view`, the canteen pass reads `mensapass`. A deployment-wide view
+    would hand the canteen pass a student's full record -- more than it may
+    see -- or the student card too little. The template names its view and
+    the render path sends it.
+    """
+    tenant, api_client = await _seed_tenant_and_client(session)
+    await _seed_published_apple_template(session, tenant.id, view_type="mensapass")
+    provider = FakeDataProvider(response={"person.name": "Ada"})
+    service = _make_service(session, FakeObjectStore(), provider)
+    auth = AuthContext(
+        client_id=api_client.id, tenant_id=tenant.id, scopes={Scope.RENDER}
+    )
+
+    await service.create_pass(
+        auth,
+        pass_id="p-1",  # noqa: S106 - an identifier, not a secret
+        template_key="student-id",
+        wallet_type=WalletType.APPLE_VAS,
+        variant_key=None,
+        person_uid="u1",
+        version_number=None,
+    )
+
+    assert provider.last_view_type == "mensapass"
+
+
+async def test_a_template_without_a_view_leaves_the_choice_to_the_client(session):
+    """No view on the template means the deployment default, decided by the
+    client -- not an empty string sent to the provider, which it would refuse."""
+    tenant, api_client = await _seed_tenant_and_client(session)
+    await _seed_published_apple_template(session, tenant.id)
+    provider = FakeDataProvider(response={"person.name": "Ada"})
+    service = _make_service(session, FakeObjectStore(), provider)
+    auth = AuthContext(
+        client_id=api_client.id, tenant_id=tenant.id, scopes={Scope.RENDER}
+    )
+
+    await service.create_pass(
+        auth,
+        pass_id="p-2",  # noqa: S106 - an identifier, not a secret
+        template_key="student-id",
+        wallet_type=WalletType.APPLE_VAS,
+        variant_key=None,
+        person_uid="u1",
+        version_number=None,
+    )
+
+    assert provider.last_view_type is None

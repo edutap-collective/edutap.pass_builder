@@ -97,7 +97,9 @@ class FakeDataProvider:
         self.last_fields: list[str] | None = None
         self.fail: bool = False
 
-    async def fetch_fields(self, person_uid: str, fields: list[str]) -> dict[str, Any]:
+    async def fetch_fields(
+        self, person_uid: str, fields: list[str], *, view_type: str | None = None
+    ) -> dict[str, Any]:
         if self.fail:
             raise ConnectionError("data provider unreachable")
         self.last_fields = fields

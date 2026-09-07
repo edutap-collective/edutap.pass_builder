@@ -22,42 +22,6 @@ export interface paths {
          */
         get: operations["list_tenants_api_v1_tenants_get"];
         put?: never;
-        /**
-         * Create Tenant
-         * @description Create a tenant.
-         *
-         *     A duplicate key is a 409 rather than an integrity error reaching the
-         *     client: `Tenant.key` is unique, and re-creating one is a plausible mistake
-         *     rather than a broken request.
-         */
-        post: operations["create_tenant_api_v1_tenants_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/audit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Audit
-         * @description List the tenant's audit entries, optionally filtered.
-         *
-         *     `template` filters by template id. `from_`/`to` bound `ts`. Results are
-         *     ordered newest first. `limit` (default 100, max 1000) and `offset`
-         *     (default 0) bound and page the result set -- the audit table grows
-         *     with every render, so an unbounded query here would eventually scan
-         *     and return the tenant's entire history. Plain limit/offset is enough
-         *     for now; cursor-based pagination is a separate follow-up if callers
-         *     ever need to page deep, stable result sets.
-         */
-        get: operations["list_audit_api_v1_tenants__tenant_id__audit_get"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -111,186 +75,6 @@ export interface paths {
          *     unattributable entries.
          */
         post: operations["revoke_client_api_v1_tenants__tenant_id__clients__client_id__revoke_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/credentials": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Credentials
-         * @description List the tenant's credential sets, metadata only.
-         */
-        get: operations["list_credentials_api_v1_tenants__tenant_id__credentials_get"];
-        put?: never;
-        /**
-         * Create Credential
-         * @description Create a credential set by generating or importing key material.
-         *
-         *     Apple either generates a fresh key from `common_name`, or imports an
-         *     existing pair from `private_key` + `certificate`. Google requires
-         *     `issuer_id` and `service_account_json`. A missing combination is a
-         *     `400 invalid_request`.
-         */
-        post: operations["create_credential_api_v1_tenants__tenant_id__credentials_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Revoke Credential
-         * @description Mark a credential set `revoked`. Never a hard delete.
-         */
-        delete: operations["revoke_credential_api_v1_tenants__tenant_id__credentials__credential_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/certificate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Install Certificate
-         * @description Install the signed certificate, activating a pending Apple credential set.
-         */
-        put: operations["install_certificate_api_v1_tenants__tenant_id__credentials__credential_id__certificate_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/csr": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Csr
-         * @description Return the stored CSR in PEM. The CSR is public, never secret.
-         */
-        get: operations["get_csr_api_v1_tenants__tenant_id__credentials__credential_id__csr_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/renew": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Renew Credential
-         * @description Create a successor Apple credential set with a fresh keypair and CSR.
-         */
-        post: operations["renew_credential_api_v1_tenants__tenant_id__credentials__credential_id__renew_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/fields": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Fields
-         * @description Return the cached data_provider field catalogue.
-         */
-        get: operations["list_fields_api_v1_tenants__tenant_id__fields_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/fields/catalogue.json": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Export Catalogue
-         * @description Return the catalogue in the shape `edutap.pass_designer` loads.
-         *
-         *     THE SAME CATALOGUE, NOT A SECOND ONE. The designer lays a pass out against
-         *     a field list and this service validates every mapping rule against one; if
-         *     those are two files, a rule authored in the designer fails at publish time
-         *     and the difference is invisible until then. The designer ships a neutral
-         *     example for development, and a deployment points it at this.
-         *
-         *     Deliberately the *cached* rows rather than a live call to the data
-         *     provider: what a rule is validated against is this cache, so what the
-         *     designer draws against has to be the same thing. `POST /fields/refresh` is
-         *     what moves both.
-         */
-        get: operations["export_catalogue_api_v1_tenants__tenant_id__fields_catalogue_json_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/tenants/{tenant_id}/fields/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Refresh Fields
-         * @description Replace the cached catalogue from `data_provider` and return it.
-         */
-        post: operations["refresh_fields_api_v1_tenants__tenant_id__fields_refresh_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -471,6 +255,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}/mappings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Mappings
+         * @description Return a version's mapping rules.
+         */
+        get: operations["get_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_get"];
+        /**
+         * Set Mappings
+         * @description Bulk replace a draft version's mapping rules. `409` once published.
+         */
+        put: operations["set_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Version
+         * @description Run full publish-time validation without publishing.
+         */
+        post: operations["validate_version_api_v1_tenants__tenant_id__versions__version_id__validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/versions/{version_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish Version
+         * @description Validate then publish a draft version, archiving its predecessor.
+         */
+        post: operations["publish_version_api_v1_tenants__tenant_id__versions__version_id__publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant_id}/versions/{version_id}/assets/{filename}": {
         parameters: {
             query?: never;
@@ -499,7 +347,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/tenants/{tenant_id}/versions/{version_id}/mappings": {
+    "/api/v1/tenants/{tenant_id}/credentials": {
         parameters: {
             query?: never;
             header?: never;
@@ -507,15 +355,40 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Mappings
-         * @description Return a version's mapping rules.
+         * List Credentials
+         * @description List the tenant's credential sets, metadata only.
          */
-        get: operations["get_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_get"];
+        get: operations["list_credentials_api_v1_tenants__tenant_id__credentials_get"];
+        put?: never;
         /**
-         * Set Mappings
-         * @description Bulk replace a draft version's mapping rules. `409` once published.
+         * Create Credential
+         * @description Create a credential set by generating or importing key material.
+         *
+         *     Apple either generates a fresh key from `common_name`, or imports an
+         *     existing pair from `private_key` + `certificate`. Google requires
+         *     `issuer_id` and `service_account_json`. A missing combination is a
+         *     `400 invalid_request`.
          */
-        put: operations["set_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_put"];
+        post: operations["create_credential_api_v1_tenants__tenant_id__credentials_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/csr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Csr
+         * @description Return the stored CSR in PEM. The CSR is public, never secret.
+         */
+        get: operations["get_csr_api_v1_tenants__tenant_id__credentials__credential_id__csr_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -523,7 +396,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/tenants/{tenant_id}/versions/{version_id}/publish": {
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/certificate": {
         parameters: {
             query?: never;
             header?: never;
@@ -531,19 +404,19 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
         /**
-         * Publish Version
-         * @description Validate then publish a draft version, archiving its predecessor.
+         * Install Certificate
+         * @description Install the signed certificate, activating a pending Apple credential set.
          */
-        post: operations["publish_version_api_v1_tenants__tenant_id__versions__version_id__publish_post"];
+        put: operations["install_certificate_api_v1_tenants__tenant_id__credentials__credential_id__certificate_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/tenants/{tenant_id}/versions/{version_id}/validate": {
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}/renew": {
         parameters: {
             query?: never;
             header?: never;
@@ -553,10 +426,129 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Validate Version
-         * @description Run full publish-time validation without publishing.
+         * Renew Credential
+         * @description Create a successor Apple credential set with a fresh keypair and CSR.
          */
-        post: operations["validate_version_api_v1_tenants__tenant_id__versions__version_id__validate_post"];
+        post: operations["renew_credential_api_v1_tenants__tenant_id__credentials__credential_id__renew_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Credential
+         * @description Mark a credential set `revoked`. Never a hard delete.
+         */
+        delete: operations["revoke_credential_api_v1_tenants__tenant_id__credentials__credential_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fields
+         * @description Return the cached data_provider field catalogue.
+         */
+        get: operations["list_fields_api_v1_tenants__tenant_id__fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/fields/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Fields
+         * @description Replace the cached catalogue from `data_provider` and return it.
+         */
+        post: operations["refresh_fields_api_v1_tenants__tenant_id__fields_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/fields/catalogue.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Catalogue
+         * @description Return the catalogue in the shape `edutap.pass_designer` loads.
+         *
+         *     THE SAME CATALOGUE, NOT A SECOND ONE. The designer lays a pass out against
+         *     a field list and this service validates every mapping rule against one; if
+         *     those are two files, a rule authored in the designer fails at publish time
+         *     and the difference is invisible until then. The designer ships a neutral
+         *     example for development, and a deployment points it at this.
+         *
+         *     Deliberately the *cached* rows rather than a live call to the data
+         *     provider: what a rule is validated against is this cache, so what the
+         *     designer draws against has to be the same thing. `POST /fields/refresh` is
+         *     what moves both.
+         */
+        get: operations["export_catalogue_api_v1_tenants__tenant_id__fields_catalogue_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit
+         * @description List the tenant's audit entries, optionally filtered.
+         *
+         *     `template` filters by template id. `from_`/`to` bound `ts`. Results are
+         *     ordered newest first. `limit` (default 100, max 1000) and `offset`
+         *     (default 0) bound and page the result set -- the audit table grows
+         *     with every render, so an unbounded query here would eventually scan
+         *     and return the tenant's entire history. Plain limit/offset is enough
+         *     for now; cursor-based pagination is a separate follow-up if callers
+         *     ever need to page deep, stable result sets.
+         */
+        get: operations["list_audit_api_v1_tenants__tenant_id__audit_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -617,8 +609,6 @@ export interface components {
          *     can show a token again is a store that can leak every token at once.
          */
         ApiClientCreated: {
-            /** Active */
-            active: boolean;
             /**
              * Id
              * Format: uuid
@@ -628,6 +618,8 @@ export interface components {
             name: string;
             /** Scopes */
             scopes: string[];
+            /** Active */
+            active: boolean;
             /** Token */
             token: string;
         };
@@ -646,8 +638,6 @@ export interface components {
          * @description An API client as the UI shows it -- never its token.
          */
         ApiClientOut: {
-            /** Active */
-            active: boolean;
             /**
              * Id
              * Format: uuid
@@ -657,66 +647,68 @@ export interface components {
             name: string;
             /** Scopes */
             scopes: string[];
+            /** Active */
+            active: boolean;
         };
         /**
          * AssetResponse
          * @description Response describing one stored template asset (metadata only).
          */
         AssetResponse: {
+            /** Filename */
+            filename: string;
+            /** Media Type */
+            media_type: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
-            /** Filename */
-            filename: string;
-            /** Media Type */
-            media_type: string;
-            /** Sha256 */
-            sha256: string;
-            /** Size */
-            size: number;
         };
         /**
          * AuditEntryResponse
          * @description Response describing one audit log entry.
          */
         AuditEntryResponse: {
-            /** Action */
-            action: string;
-            /** Actor Client Id */
-            actor_client_id?: string | null;
-            /** Actor Principal */
-            actor_principal?: string | null;
-            /** Duration Ms */
-            duration_ms: number;
-            /** Error Code */
-            error_code?: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
-            /** Outcome */
-            outcome: string;
-            /** Request Id */
-            request_id: string;
-            /** Requested Fields */
-            requested_fields: string[];
-            /** Subject Ref */
-            subject_ref?: string | null;
-            /** Template Id */
-            template_id?: string | null;
             /**
              * Ts
              * Format: date-time
              */
             ts: string;
+            /** Request Id */
+            request_id: string;
+            /** Actor Client Id */
+            actor_client_id?: string | null;
+            /** Actor Principal */
+            actor_principal?: string | null;
+            /** Action */
+            action: string;
+            /** Outcome */
+            outcome: string;
+            /** Error Code */
+            error_code?: string | null;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Template Id */
+            template_id?: string | null;
             /** Variant Id */
             variant_id?: string | null;
             /** Version Id */
             version_id?: string | null;
             wallet_type?: components["schemas"]["WalletType"] | null;
+            /** Subject Ref */
+            subject_ref?: string | null;
+            /** Requested Fields */
+            requested_fields: string[];
         };
         /**
          * CatalogueExport
@@ -735,17 +727,17 @@ export interface components {
          * @description Request body to create, import or install a credential set.
          */
         CreateCredentialRequest: {
-            /** Certificate */
-            certificate?: string | null;
-            /** Common Name */
-            common_name?: string | null;
-            /** Issuer Id */
-            issuer_id?: string | null;
+            provider: components["schemas"]["Provider"];
             /** Label */
             label: string;
+            /** Common Name */
+            common_name?: string | null;
             /** Private Key */
             private_key?: string | null;
-            provider: components["schemas"]["Provider"];
+            /** Certificate */
+            certificate?: string | null;
+            /** Issuer Id */
+            issuer_id?: string | null;
             /** Service Account Json */
             service_account_json?: {
                 [key: string]: unknown;
@@ -756,32 +748,34 @@ export interface components {
          * @description Request body to create a new template.
          */
         CreateTemplateRequest: {
-            /** Description */
-            description?: string | null;
             /** Key */
             key: string;
             /** Name */
             name: string;
+            /** Description */
+            description?: string | null;
+            /** View Type */
+            view_type?: string | null;
         };
         /**
          * CreateVariantRequest
          * @description Request body to create a new template variant.
          */
         CreateVariantRequest: {
-            /** Credential Set Id */
-            credential_set_id?: string | null;
-            /** Google Class Id */
-            google_class_id?: string | null;
-            /**
-             * Is Default
-             * @default false
-             */
-            is_default: boolean;
             /** Key */
             key: string;
             /** Name */
             name: string;
             wallet_type: components["schemas"]["WalletType"];
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default: boolean;
+            /** Credential Set Id */
+            credential_set_id?: string | null;
+            /** Google Class Id */
+            google_class_id?: string | null;
         };
         /**
          * CredentialResponse
@@ -791,33 +785,33 @@ export interface components {
          *     `ciphertext`, `nonce` or `wrapped_dek`. See the module docstring.
          */
         CredentialResponse: {
-            /** Cert Fingerprint Sha256 */
-            cert_fingerprint_sha256?: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
-            /** Issuer Id */
-            issuer_id?: string | null;
+            provider: components["schemas"]["Provider"];
             /** Label */
             label: string;
-            /** Nfc Capable */
-            nfc_capable?: boolean | null;
-            /** Not After */
-            not_after?: string | null;
-            /** Not Before */
-            not_before?: string | null;
-            /** Organization Name */
-            organization_name?: string | null;
+            status: components["schemas"]["CredentialStatus"];
             /** Pass Type Identifier */
             pass_type_identifier?: string | null;
-            provider: components["schemas"]["Provider"];
-            /** Service Account Email */
-            service_account_email?: string | null;
-            status: components["schemas"]["CredentialStatus"];
             /** Team Identifier */
             team_identifier?: string | null;
+            /** Organization Name */
+            organization_name?: string | null;
+            /** Not Before */
+            not_before?: string | null;
+            /** Not After */
+            not_after?: string | null;
+            /** Nfc Capable */
+            nfc_capable?: boolean | null;
+            /** Service Account Email */
+            service_account_email?: string | null;
+            /** Issuer Id */
+            issuer_id?: string | null;
+            /** Cert Fingerprint Sha256 */
+            cert_fingerprint_sha256?: string | null;
         };
         /**
          * CredentialStatus
@@ -830,15 +824,15 @@ export interface components {
          * @description Response describing one entry of the data-provider field catalogue.
          */
         FieldResponse: {
-            /** Description */
-            description?: string | null;
             /** Key */
             key: string;
+            value_type: components["schemas"]["ValueType"];
             /** Label */
             label: string;
             /** Required */
             required: boolean;
-            value_type: components["schemas"]["ValueType"];
+            /** Description */
+            description?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -880,6 +874,17 @@ export interface components {
          * @description A single substitution rule, decoupled from the database row.
          */
         RuleSpec: {
+            target_kind: components["schemas"]["TargetKind"];
+            /** Target */
+            target: string;
+            /** Source Field */
+            source_field: string;
+            value_type: components["schemas"]["ValueType"];
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
             /** Default Value */
             default_value?: string | null;
             /**
@@ -887,17 +892,6 @@ export interface components {
              * @default 0
              */
             position: number;
-            /**
-             * Required
-             * @default true
-             */
-            required: boolean;
-            /** Source Field */
-            source_field: string;
-            /** Target */
-            target: string;
-            target_kind: components["schemas"]["TargetKind"];
-            value_type: components["schemas"]["ValueType"];
         };
         /**
          * Scope
@@ -916,15 +910,6 @@ export interface components {
          * @description Response describing a template.
          */
         TemplateResponse: {
-            /** Archived At */
-            archived_at?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Description */
-            description?: string | null;
             /**
              * Id
              * Format: uuid
@@ -934,16 +919,17 @@ export interface components {
             key: string;
             /** Name */
             name: string;
-        };
-        /**
-         * TenantIn
-         * @description A tenant to create.
-         */
-        TenantIn: {
-            /** Key */
-            key: string;
-            /** Name */
-            name: string;
+            /** Description */
+            description?: string | null;
+            /** View Type */
+            view_type?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /**
          * TenantOut
@@ -959,56 +945,60 @@ export interface components {
             key: string;
             /** Name */
             name: string;
+            /** Active */
+            active: boolean;
         };
         /**
          * UpdateTemplateRequest
-         * @description Request body to patch a template's name or description.
+         * @description Request body to patch a template's name, description or view.
          */
         UpdateTemplateRequest: {
-            /** Description */
-            description?: string | null;
             /** Name */
             name?: string | null;
+            /** Description */
+            description?: string | null;
+            /** View Type */
+            view_type?: string | null;
         };
         /**
          * UpdateVariantRequest
          * @description Request body to patch a variant's default flag or credential/class id.
          */
         UpdateVariantRequest: {
+            /** Name */
+            name?: string | null;
+            /** Is Default */
+            is_default?: boolean | null;
             /** Credential Set Id */
             credential_set_id?: string | null;
             /** Google Class Id */
             google_class_id?: string | null;
-            /** Is Default */
-            is_default?: boolean | null;
-            /** Name */
-            name?: string | null;
         };
         /** ValidationError */
         ValidationError: {
-            /** Context */
-            ctx?: Record<string, never>;
-            /** Input */
-            input?: unknown;
             /** Location */
             loc: (string | number)[];
             /** Message */
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /**
          * ValidationResponse
          * @description Response describing the outcome of a (non-publishing) validation run.
          */
         ValidationResponse: {
+            /** Valid */
+            valid: boolean;
             /**
              * Findings
              * @default []
              */
             findings: string[];
-            /** Valid */
-            valid: boolean;
         };
         /**
          * ValueType
@@ -1021,34 +1011,34 @@ export interface components {
          * @description Response describing a template variant.
          */
         VariantResponse: {
-            /** Archived At */
-            archived_at?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Credential Set Id */
-            credential_set_id?: string | null;
-            /** Google Class Id */
-            google_class_id?: string | null;
             /**
              * Id
              * Format: uuid
              */
             id: string;
-            /** Is Default */
-            is_default: boolean;
-            /** Key */
-            key: string;
-            /** Name */
-            name: string;
             /**
              * Template Id
              * Format: uuid
              */
             template_id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
             wallet_type: components["schemas"]["WalletType"];
+            /** Is Default */
+            is_default: boolean;
+            /** Credential Set Id */
+            credential_set_id?: string | null;
+            /** Google Class Id */
+            google_class_id?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Archived At */
+            archived_at?: string | null;
         };
         /**
          * VersionResponse
@@ -1056,15 +1046,18 @@ export interface components {
          */
         VersionResponse: {
             /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
              * Id
              * Format: uuid
              */
             id: string;
+            /**
+             * Variant Id
+             * Format: uuid
+             */
+            variant_id: string;
+            /** Number */
+            number: number;
+            status: components["schemas"]["VersionStatus"];
             /** Nfc Enabled */
             nfc_enabled: boolean;
             /** Nfc Encryption Public Key */
@@ -1076,16 +1069,13 @@ export interface components {
             nfc_requires_authentication: boolean;
             /** Notes */
             notes?: string | null;
-            /** Number */
-            number: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
             /** Published At */
             published_at?: string | null;
-            status: components["schemas"]["VersionStatus"];
-            /**
-             * Variant Id
-             * Format: uuid
-             */
-            variant_id: string;
         };
         /**
          * VersionStatus
@@ -1124,78 +1114,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TenantOut"][];
-                };
-            };
-        };
-    };
-    create_tenant_api_v1_tenants_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TenantIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TenantOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_audit_api_v1_tenants__tenant_id__audit_get: {
-        parameters: {
-            query?: {
-                from_?: string | null;
-                to?: string | null;
-                template?: string | null;
-                subject_ref?: string | null;
-                outcome?: string | null;
-                limit?: number;
-                offset?: number;
-            };
-            header?: never;
-            path: {
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuditEntryResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1284,298 +1202,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_credentials_api_v1_tenants__tenant_id__credentials_get: {
-        parameters: {
-            query?: {
-                provider?: components["schemas"]["Provider"] | null;
-                expiring_within?: string | null;
-            };
-            header?: never;
-            path: {
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CredentialResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    create_credential_api_v1_tenants__tenant_id__credentials_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateCredentialRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CredentialResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    revoke_credential_api_v1_tenants__tenant_id__credentials__credential_id__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                credential_id: string;
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    install_certificate_api_v1_tenants__tenant_id__credentials__credential_id__certificate_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                credential_id: string;
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["InstallCertificateRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CredentialResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_csr_api_v1_tenants__tenant_id__credentials__credential_id__csr_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                credential_id: string;
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    renew_credential_api_v1_tenants__tenant_id__credentials__credential_id__renew_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                credential_id: string;
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CredentialResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_fields_api_v1_tenants__tenant_id__fields_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FieldResponse"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    export_catalogue_api_v1_tenants__tenant_id__fields_catalogue_json_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CatalogueExport"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    refresh_fields_api_v1_tenants__tenant_id__fields_refresh_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tenant_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FieldResponse"][];
-                };
             };
             /** @description Validation Error */
             422: {
@@ -2020,6 +1646,138 @@ export interface operations {
             };
         };
     };
+    get_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MappingRulesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MappingRulesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MappingRulesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_version_api_v1_tenants__tenant_id__versions__version_id__validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_version_api_v1_tenants__tenant_id__versions__version_id__publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_asset_api_v1_tenants__tenant_id__versions__version_id__assets__filename__get: {
         parameters: {
             query?: never;
@@ -2117,12 +1875,14 @@ export interface operations {
             };
         };
     };
-    get_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_get: {
+    list_credentials_api_v1_tenants__tenant_id__credentials_get: {
         parameters: {
-            query?: never;
+            query?: {
+                provider?: components["schemas"]["Provider"] | null;
+                expiring_within?: string | null;
+            };
             header?: never;
             path: {
-                version_id: string;
                 tenant_id: string;
             };
             cookie?: never;
@@ -2135,7 +1895,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MappingRulesResponse"];
+                    "application/json": components["schemas"]["CredentialResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -2149,29 +1909,28 @@ export interface operations {
             };
         };
     };
-    set_mappings_api_v1_tenants__tenant_id__versions__version_id__mappings_put: {
+    create_credential_api_v1_tenants__tenant_id__credentials_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                version_id: string;
                 tenant_id: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MappingRulesRequest"];
+                "application/json": components["schemas"]["CreateCredentialRequest"];
             };
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MappingRulesResponse"];
+                    "application/json": components["schemas"]["CredentialResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2185,12 +1944,12 @@ export interface operations {
             };
         };
     };
-    publish_version_api_v1_tenants__tenant_id__versions__version_id__publish_post: {
+    get_csr_api_v1_tenants__tenant_id__credentials__credential_id__csr_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                version_id: string;
+                credential_id: string;
                 tenant_id: string;
             };
             cookie?: never;
@@ -2203,7 +1962,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VersionResponse"];
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -2217,12 +1976,48 @@ export interface operations {
             };
         };
     };
-    validate_version_api_v1_tenants__tenant_id__versions__version_id__validate_post: {
+    install_certificate_api_v1_tenants__tenant_id__credentials__credential_id__certificate_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                version_id: string;
+                credential_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallCertificateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    renew_credential_api_v1_tenants__tenant_id__credentials__credential_id__renew_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
                 tenant_id: string;
             };
             cookie?: never;
@@ -2235,7 +2030,169 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ValidationResponse"];
+                    "application/json": components["schemas"]["CredentialResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_credential_api_v1_tenants__tenant_id__credentials__credential_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_fields_api_v1_tenants__tenant_id__fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_fields_api_v1_tenants__tenant_id__fields_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_catalogue_api_v1_tenants__tenant_id__fields_catalogue_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogueExport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_api_v1_tenants__tenant_id__audit_get: {
+        parameters: {
+            query?: {
+                from_?: string | null;
+                to?: string | null;
+                template?: string | null;
+                subject_ref?: string | null;
+                outcome?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                tenant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntryResponse"][];
                 };
             };
             /** @description Validation Error */

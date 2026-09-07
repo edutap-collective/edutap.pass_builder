@@ -206,6 +206,19 @@ class Template(Base, table=True):
     key: str
     name: str
     description: str | None = None
+    view_type: str | None = None
+    """Which of the data provider's views this template reads, or None.
+
+    None means the deployment's default (`DATA_PROVIDER_VIEW_TYPE`). Nullable
+    and WITHOUT a server default, on purpose: a NOT NULL column cannot be added
+    to a table that holds rows -- that is what broke `tenant.active` on
+    2026-09-06 -- and a server default here would silently pin every existing
+    template to one named view. Only a template that names a view changes
+    what it reads.
+
+    Three tenants, three passes, one provider: the student card reads
+    `full_view`, the canteen pass reads `mensapass`. The view belongs to the
+    pass, not to the deployment."""
     created_at: datetime = Field(default_factory=_now, sa_column=_tz(nullable=False))
     archived_at: datetime | None = Field(default=None, sa_column=_tz(nullable=True))
 

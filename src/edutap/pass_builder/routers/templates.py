@@ -74,6 +74,7 @@ def _template_response(template: Template) -> TemplateResponse:
         key=template.key,
         name=template.name,
         description=template.description,
+        view_type=template.view_type,
         created_at=template.created_at,
         archived_at=template.archived_at,
     )
@@ -132,7 +133,7 @@ async def create_template(
 ) -> TemplateResponse:
     """Create a new template."""
     template = await templates.create_template(
-        auth.tenant_id, body.key, body.name, body.description
+        auth.tenant_id, body.key, body.name, body.description, body.view_type
     )
     return _template_response(template)
 
@@ -157,7 +158,7 @@ async def update_template(
 ) -> TemplateResponse:
     """Patch a template's name or description."""
     template = await templates.update_template(
-        auth.tenant_id, template_id, body.name, body.description
+        auth.tenant_id, template_id, body.name, body.description, body.view_type
     )
     return _template_response(template)
 

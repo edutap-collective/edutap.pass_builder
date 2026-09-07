@@ -8,7 +8,7 @@ import { JsonEditor } from "./JsonEditor";
 import { PassPreview } from "./PassPreview";
 import { Problem } from "./Tenants";
 
-type Template = { id: string; key: string; name: string };
+type Template = { id: string; key: string; name: string; view_type: string | null };
 type Variant = {
   id: string;
   key: string;
@@ -23,6 +23,7 @@ export function Templates({ tenantId }: { tenantId: string }) {
   const queryClient = useQueryClient();
   const [key, setKey] = useState("");
   const [name, setName] = useState("");
+  const [viewType, setViewType] = useState("");
   const [open, setOpen] = useState<string | null>(null);
 
   const templates = useQuery({
@@ -40,7 +41,7 @@ export function Templates({ tenantId }: { tenantId: string }) {
     mutationFn: async () => {
       const { data, error } = await client.POST("/api/v1/tenants/{tenant_id}/templates", {
         params: { path: { tenant_id: tenantId } },
-        body: { key, name },
+        body: { key, name, view_type: viewType.trim() || null },
       });
       if (error) throw error;
       return data as Template;
@@ -48,6 +49,7 @@ export function Templates({ tenantId }: { tenantId: string }) {
     onSuccess: () => {
       setKey("");
       setName("");
+      setViewType("");
       void queryClient.invalidateQueries({ queryKey: ["templates", tenantId] });
     },
   });
@@ -76,6 +78,15 @@ export function Templates({ tenantId }: { tenantId: string }) {
           onChange={(event) => setName(event.target.value)}
           required
         />
+        {/* Optional. Empty means the deployment's default view; the canteen
+            pass names `mensapass`, the student card leaves it empty. */}
+        <input
+          aria-label={t("templates.view")}
+          placeholder={t("templates.view")}
+          title={t("templates.viewHint")}
+          value={viewType}
+          onChange={(event) => setViewType(event.target.value)}
+        />
         <button type="submit" disabled={create.isPending}>
           {t("templates.create")}
         </button>
@@ -92,6 +103,12 @@ export function Templates({ tenantId }: { tenantId: string }) {
                 onClick={() => setOpen(open === template.id ? null : template.id)}
               >
                 {template.name} (<code>{template.key}</code>)
+                {template.view_type ? (
+                  <>
+                    {" "}
+                    <code className="hint">{template.view_type}</code>
+                  </>
+                ) : null}
               </button>
               {open === template.id ? (
                 <Variants tenantId={tenantId} templateId={template.id} />

@@ -36,7 +36,9 @@
     "designerFiles": "Designer-Dateien (class.json, object.json, mappings.json)",
     "importDesigner": "Aus dem Designer übernehmen",
     "valid": "Keine Beanstandungen",
-    "saveVersion": "Fassung speichern"
+    "saveVersion": "Fassung speichern",
+    "view": "Datensicht",
+    "viewHint": "Welchen View des Datenlieferanten dieser Ausweis liest. Leer lassen für den Standard des Deployments."
   },
   "credentials": {
     "empty": "Keine Credentials",

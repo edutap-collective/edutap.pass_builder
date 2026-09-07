@@ -55,15 +55,26 @@ class DataProviderClient:
         self._client = client
         self._view_type = view_type
 
-    async def fetch_fields(self, person_uid: str, fields: list[str]) -> dict[str, Any]:
+    async def fetch_fields(
+        self, person_uid: str, fields: list[str], *, view_type: str | None = None
+    ) -> dict[str, Any]:
         """Return exactly the requested fields for one person.
+
+        `view_type` names the provider view for this call; None means the
+        client's own default, the deployment-wide one. A template that names
+        its view passes it here -- the canteen pass reads `mensapass` while
+        the student card reads `full_view`, from the same provider.
 
         Retries once on a connection error. Never retries on an error
         response. Raises ProblemError(502, "data_provider_unavailable")
         without leaking the person UID or any field values.
         """
         payload = json.dumps(
-            {"person_uid": person_uid, "view_type": self._view_type, "fields": fields},
+            {
+                "person_uid": person_uid,
+                "view_type": view_type or self._view_type,
+                "fields": fields,
+            },
             separators=(",", ":"),
         ).encode()
         for attempt in (1, 2):

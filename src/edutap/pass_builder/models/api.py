@@ -94,6 +94,8 @@ class CreateTemplateRequest(BaseModel):
     key: str
     name: str
     description: str | None = None
+    view_type: str | None = None
+    """The provider view this template reads; None for the deployment default."""
 
 
 class TemplateResponse(BaseModel):
@@ -103,15 +105,17 @@ class TemplateResponse(BaseModel):
     key: str
     name: str
     description: str | None = None
+    view_type: str | None = None
     created_at: datetime
     archived_at: datetime | None = None
 
 
 class UpdateTemplateRequest(BaseModel):
-    """Request body to patch a template's name or description."""
+    """Request body to patch a template's name, description or view."""
 
     name: str | None = None
     description: str | None = None
+    view_type: str | None = None
 
 
 class CreateVariantRequest(BaseModel):

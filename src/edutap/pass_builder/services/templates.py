@@ -346,11 +346,20 @@ class TemplateService:
     # --- template CRUD -----------------------------------------------------
 
     async def create_template(
-        self, tenant_id: UUID, key: str, name: str, description: str | None
+        self,
+        tenant_id: UUID,
+        key: str,
+        name: str,
+        description: str | None,
+        view_type: str | None = None,
     ) -> Template:
         """Create a new template for a tenant."""
         template = Template(
-            tenant_id=tenant_id, key=key, name=name, description=description
+            tenant_id=tenant_id,
+            key=key,
+            name=name,
+            description=description,
+            view_type=view_type,
         )
         self._session.add(template)
         await self._session.flush()
@@ -383,13 +392,16 @@ class TemplateService:
         template_id: UUID,
         name: str | None,
         description: str | None,
+        view_type: str | None = None,
     ) -> Template:
-        """Patch a template's name and/or description."""
+        """Patch a template's name, description and/or view."""
         template = await self.get_template(tenant_id, template_id)
         if name is not None:
             template.name = name
         if description is not None:
             template.description = description
+        if view_type is not None:
+            template.view_type = view_type
         self._session.add(template)
         await self._session.flush()
         return template

@@ -87,3 +87,26 @@ async def test_a_provider_error_is_still_unavailable():
         with pytest.raises(ProblemError) as excinfo:
             await make_client(http).fetch_catalogue()
     assert excinfo.value.slug == "data_provider_unavailable"
+
+
+@respx.mock
+async def test_a_view_per_call_overrides_the_clients_default():
+    """The client carries the deployment default; a template may name its own."""
+    route = respx.post("http://dp/lookup").mock(
+        return_value=httpx.Response(200, json={"person.name": "Ada"})
+    )
+    async with httpx.AsyncClient() as http:
+        await make_client(http).fetch_fields(
+            "u1", ["person.name"], view_type="mensapass"
+        )
+    assert b'"view_type":"mensapass"' in route.calls.last.request.content
+
+
+@respx.mock
+async def test_no_view_per_call_means_the_clients_default():
+    route = respx.post("http://dp/lookup").mock(
+        return_value=httpx.Response(200, json={"person.name": "Ada"})
+    )
+    async with httpx.AsyncClient() as http:
+        await make_client(http).fetch_fields("u1", ["person.name"], view_type=None)
+    assert b'"view_type":"full_view"' in route.calls.last.request.content
