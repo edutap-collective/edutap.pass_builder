@@ -38,7 +38,8 @@
     "valid": "Keine Beanstandungen",
     "saveVersion": "Fassung speichern",
     "view": "Datensicht",
-    "viewHint": "Welchen View des Datenlieferanten dieser Ausweis liest. Leer lassen für den Standard des Deployments."
+    "viewHint": "Welchen View des Datenlieferanten dieser Ausweis liest. Leer lassen für den Standard des Deployments.",
+    "saveView": "Datensicht speichern"
   },
   "credentials": {
     "empty": "Keine Credentials",
