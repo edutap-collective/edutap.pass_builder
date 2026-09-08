@@ -56,9 +56,12 @@ class TenantOut(BaseModel):
 async def _tenant_key(request: Request, tenant_id: str) -> str:
     """Resolve the path's tenant UUID to the key permissions carry.
 
-    Through the same `get_session` the routes use -- honouring a test's
-    dependency override -- so the check shares the request's transaction
-    instead of opening a second session that cannot see it.
+    Through the same `get_session` factory the routes use, honouring a
+    test's dependency override -- there the override hands back the
+    request's session, so the lookup sees rows seeded in the test's
+    transaction. In production, where nothing overrides it, this is a
+    second short-lived session on the same engine: it reads committed
+    tenant rows, which is all this lookup needs.
     """
     try:
         wanted = UUID(tenant_id)
