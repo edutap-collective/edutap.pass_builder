@@ -24,13 +24,13 @@ dependencies = [
     "alembic>=1.13",
     "asyncpg>=0.29",
     "cryptography>=43",
-    # The shared vocabulary. `WalletType` lives there, not here: a copy of a shared
-    # enum is a second truth, and the copy that stood in `models/enums.py` was on the
-    # coarse provider axis -- it could not express VAS versus Access at all.
     # Person authentication and per-route permission checks for the admin mount
     # (ADR 0001). A tarball URL rather than git+https, deliberately: the Docker
     # build stage has no git executable, and an archive download needs none.
     "edutap.admin_auth @ https://github.com/edutap-collective/edutap.admin_auth/archive/refs/tags/v0.1.0.tar.gz",
+    # The shared vocabulary. `WalletType` lives there, not here: a copy of a shared
+    # enum is a second truth, and the copy that stood in `models/enums.py` was on the
+    # coarse provider axis -- it could not express VAS versus Access at all.
     "edutap.data_models>=0.3,<0.4",
     # How this service reaches the cluster: every node, the primary among them,
     # TLS per driver, and the password as a mounted file. All of it lives in
