@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..admin.permissions import declares
 from ..auth import AuthContext, require
 from ..database import get_session
 from ..dependencies import get_credential_service, get_template_service
@@ -115,7 +116,11 @@ def _version_response(version: TemplateVersion) -> VersionResponse:
 # --- templates ---------------------------------------------------------------
 
 
-@router.get("/templates", response_model=list[TemplateResponse])
+@router.get(
+    "/templates",
+    response_model=list[TemplateResponse],
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def list_templates(
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     templates: TemplateService = Depends(get_template_service),  # noqa: B008
@@ -125,7 +130,12 @@ async def list_templates(
     return [_template_response(row) for row in rows]
 
 
-@router.post("/templates", status_code=201, response_model=TemplateResponse)
+@router.post(
+    "/templates",
+    status_code=201,
+    response_model=TemplateResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def create_template(
     body: CreateTemplateRequest,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -138,7 +148,11 @@ async def create_template(
     return _template_response(template)
 
 
-@router.get("/templates/{template_id}", response_model=TemplateResponse)
+@router.get(
+    "/templates/{template_id}",
+    response_model=TemplateResponse,
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def get_template(
     template_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -149,7 +163,11 @@ async def get_template(
     return _template_response(template)
 
 
-@router.patch("/templates/{template_id}", response_model=TemplateResponse)
+@router.patch(
+    "/templates/{template_id}",
+    response_model=TemplateResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def update_template(
     template_id: UUID,
     body: UpdateTemplateRequest,
@@ -163,7 +181,11 @@ async def update_template(
     return _template_response(template)
 
 
-@router.delete("/templates/{template_id}", response_model=TemplateResponse)
+@router.delete(
+    "/templates/{template_id}",
+    response_model=TemplateResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def archive_template(
     template_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -177,7 +199,11 @@ async def archive_template(
 # --- variants ------------------------------------------------------------------
 
 
-@router.get("/templates/{template_id}/variants", response_model=list[VariantResponse])
+@router.get(
+    "/templates/{template_id}/variants",
+    response_model=list[VariantResponse],
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def list_variants(
     template_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -189,7 +215,10 @@ async def list_variants(
 
 
 @router.post(
-    "/templates/{template_id}/variants", status_code=201, response_model=VariantResponse
+    "/templates/{template_id}/variants",
+    status_code=201,
+    response_model=VariantResponse,
+    dependencies=[Depends(declares("templates:write"))],
 )
 async def create_variant(
     template_id: UUID,
@@ -211,7 +240,11 @@ async def create_variant(
     return _variant_response(variant)
 
 
-@router.get("/variants/{variant_id}", response_model=VariantResponse)
+@router.get(
+    "/variants/{variant_id}",
+    response_model=VariantResponse,
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def get_variant(
     variant_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -222,7 +255,11 @@ async def get_variant(
     return _variant_response(variant)
 
 
-@router.patch("/variants/{variant_id}", response_model=VariantResponse)
+@router.patch(
+    "/variants/{variant_id}",
+    response_model=VariantResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def update_variant(
     variant_id: UUID,
     body: UpdateVariantRequest,
@@ -241,7 +278,9 @@ async def update_variant(
     return _variant_response(variant)
 
 
-@router.post("/variants/{variant_id}/sync")
+@router.post(
+    "/variants/{variant_id}/sync", dependencies=[Depends(declares("templates:write"))]
+)
 async def sync_variant(
     variant_id: UUID,
     request: Request,
@@ -287,7 +326,11 @@ async def sync_variant(
 # --- versions --------------------------------------------------------------------
 
 
-@router.get("/variants/{variant_id}/versions", response_model=list[VersionResponse])
+@router.get(
+    "/variants/{variant_id}/versions",
+    response_model=list[VersionResponse],
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def list_versions(
     variant_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -299,7 +342,10 @@ async def list_versions(
 
 
 @router.post(
-    "/variants/{variant_id}/versions", status_code=201, response_model=VersionResponse
+    "/variants/{variant_id}/versions",
+    status_code=201,
+    response_model=VersionResponse,
+    dependencies=[Depends(declares("templates:write"))],
 )
 async def create_version(
     variant_id: UUID,
@@ -333,7 +379,11 @@ async def create_version(
     return _version_response(version)
 
 
-@router.get("/versions/{version_id}", response_model=VersionResponse)
+@router.get(
+    "/versions/{version_id}",
+    response_model=VersionResponse,
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def get_version(
     version_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -344,7 +394,11 @@ async def get_version(
     return _version_response(version)
 
 
-@router.get("/versions/{version_id}/mappings", response_model=MappingRulesResponse)
+@router.get(
+    "/versions/{version_id}/mappings",
+    response_model=MappingRulesResponse,
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def get_mappings(
     version_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -355,7 +409,11 @@ async def get_mappings(
     return MappingRulesResponse(rules=rules)
 
 
-@router.put("/versions/{version_id}/mappings", response_model=MappingRulesResponse)
+@router.put(
+    "/versions/{version_id}/mappings",
+    response_model=MappingRulesResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def set_mappings(
     version_id: UUID,
     body: MappingRulesRequest,
@@ -368,7 +426,11 @@ async def set_mappings(
     return MappingRulesResponse(rules=rules)
 
 
-@router.post("/versions/{version_id}/validate", response_model=ValidationResponse)
+@router.post(
+    "/versions/{version_id}/validate",
+    response_model=ValidationResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def validate_version(
     version_id: UUID,
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
@@ -379,7 +441,11 @@ async def validate_version(
     return ValidationResponse(valid=not findings, findings=findings)
 
 
-@router.post("/versions/{version_id}/publish", response_model=VersionResponse)
+@router.post(
+    "/versions/{version_id}/publish",
+    response_model=VersionResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def publish_version(
     version_id: UUID,
     request: Request,
@@ -415,7 +481,10 @@ def _asset_media_type(asset: TemplateAsset) -> str:
     return asset.media_type or "application/octet-stream"
 
 
-@router.get("/versions/{version_id}/assets/{filename}")
+@router.get(
+    "/versions/{version_id}/assets/{filename}",
+    dependencies=[Depends(declares("templates:read"))],
+)
 async def get_asset(
     version_id: UUID,
     filename: str,
@@ -427,7 +496,11 @@ async def get_asset(
     return Response(content=data, media_type=_asset_media_type(asset))
 
 
-@router.put("/versions/{version_id}/assets/{filename}", response_model=AssetResponse)
+@router.put(
+    "/versions/{version_id}/assets/{filename}",
+    response_model=AssetResponse,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def put_asset(
     version_id: UUID,
     filename: str,
@@ -459,7 +532,11 @@ async def put_asset(
     )
 
 
-@router.delete("/versions/{version_id}/assets/{filename}", status_code=204)
+@router.delete(
+    "/versions/{version_id}/assets/{filename}",
+    status_code=204,
+    dependencies=[Depends(declares("templates:write"))],
+)
 async def delete_asset(
     version_id: UUID,
     filename: str,

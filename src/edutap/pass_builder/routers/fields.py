@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..admin.permissions import declares
 from ..auth import AuthContext, require
 from ..clients.data_provider import DataProviderClient
 from ..database import get_session
@@ -27,7 +28,11 @@ def _to_response(field: DataField) -> FieldResponse:
     )
 
 
-@router.get("/fields", response_model=list[FieldResponse])
+@router.get(
+    "/fields",
+    response_model=list[FieldResponse],
+    dependencies=[Depends(declares("fields:read"))],
+)
 async def list_fields(
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     session: AsyncSession = Depends(get_session),  # noqa: B008
@@ -37,7 +42,11 @@ async def list_fields(
     return [_to_response(row) for row in rows]
 
 
-@router.post("/fields/refresh", response_model=list[FieldResponse])
+@router.post(
+    "/fields/refresh",
+    response_model=list[FieldResponse],
+    dependencies=[Depends(declares("fields:refresh"))],
+)
 async def refresh_fields(
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     session: AsyncSession = Depends(get_session),  # noqa: B008
@@ -49,7 +58,11 @@ async def refresh_fields(
     return [_to_response(row) for row in rows]
 
 
-@router.get("/fields/catalogue.json", response_model=CatalogueExport)
+@router.get(
+    "/fields/catalogue.json",
+    response_model=CatalogueExport,
+    dependencies=[Depends(declares("fields:read"))],
+)
 async def export_catalogue(
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     session: AsyncSession = Depends(get_session),  # noqa: B008

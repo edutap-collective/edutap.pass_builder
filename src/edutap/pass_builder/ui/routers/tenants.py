@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...admin.permissions import declares
 from ...auth import hash_token
 from ...database import get_session
 from ...errors import ProblemError
@@ -92,7 +93,11 @@ async def list_tenants(
 # reason.
 
 
-@router.get("/tenants/{tenant_id}/clients", response_model=list[ApiClientOut])
+@router.get(
+    "/tenants/{tenant_id}/clients",
+    response_model=list[ApiClientOut],
+    dependencies=[Depends(declares("clients:read"))],
+)
 async def list_clients(
     tenant_id: UUID,
     session: AsyncSession = Depends(get_session),  # noqa: B008
@@ -115,7 +120,10 @@ async def list_clients(
 
 
 @router.post(
-    "/tenants/{tenant_id}/clients", response_model=ApiClientCreated, status_code=201
+    "/tenants/{tenant_id}/clients",
+    response_model=ApiClientCreated,
+    status_code=201,
+    dependencies=[Depends(declares("clients:write"))],
 )
 async def create_client(
     tenant_id: UUID,
@@ -148,7 +156,11 @@ async def create_client(
     )
 
 
-@router.post("/tenants/{tenant_id}/clients/{client_id}/revoke", status_code=204)
+@router.post(
+    "/tenants/{tenant_id}/clients/{client_id}/revoke",
+    status_code=204,
+    dependencies=[Depends(declares("clients:write"))],
+)
 async def revoke_client(
     tenant_id: UUID,
     client_id: UUID,

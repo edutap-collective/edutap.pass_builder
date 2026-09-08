@@ -3,7 +3,7 @@ import pytest
 from edutap.pass_builder.settings import Settings, get_settings
 from edutap.pass_builder.ui.auth import Principal, is_authorised
 
-from .conftest import AUTHORISED, AUTHORISED_GROUP
+from .conftest import AUTHORISED_GROUP
 
 
 def settings_with(monkeypatch, *, users: str = "", groups: str = "") -> Settings:
@@ -94,4 +94,3 @@ async def test_the_allow_listed_principal_gets_through(ui):
     response = await ui.get("/tenants")
     assert response.status_code == 200
     assert response.json() == []
-    assert AUTHORISED  # the fixture's principal, asserted on every request

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..admin.permissions import declares
 from ..auth import AuthContext, require
 from ..database import get_session
 from ..models.api import AuditEntryResponse
@@ -38,7 +39,11 @@ def _to_response(entry: AuditLog) -> AuditEntryResponse:
     )
 
 
-@router.get("/audit", response_model=list[AuditEntryResponse])
+@router.get(
+    "/audit",
+    response_model=list[AuditEntryResponse],
+    dependencies=[Depends(declares("audit:read"))],
+)
 async def list_audit(
     from_: datetime | None = None,
     to: datetime | None = None,
