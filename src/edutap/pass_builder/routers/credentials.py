@@ -13,6 +13,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..admin.permissions import declares
 from ..auth import AuthContext, require
 from ..database import get_session
 from ..dependencies import get_credential_service
@@ -97,7 +98,11 @@ def _parse_expiring_within(raw: str | None) -> int | None:
     return int(match.group(1))
 
 
-@router.get("/credentials", response_model=list[CredentialResponse])
+@router.get(
+    "/credentials",
+    response_model=list[CredentialResponse],
+    dependencies=[Depends(declares("credentials:read"))],
+)
 async def list_credentials(
     provider: Provider | None = None,
     expiring_within: str | None = None,
@@ -113,7 +118,12 @@ async def list_credentials(
     return [_to_response(row) for row in sets]
 
 
-@router.post("/credentials", status_code=201, response_model=CredentialResponse)
+@router.post(
+    "/credentials",
+    status_code=201,
+    response_model=CredentialResponse,
+    dependencies=[Depends(declares("credentials:write"))],
+)
 async def create_credential(
     body: CreateCredentialRequest,
     request: Request,
@@ -164,7 +174,10 @@ async def create_credential(
     return _to_response(credential_set)
 
 
-@router.get("/credentials/{credential_id}/csr")
+@router.get(
+    "/credentials/{credential_id}/csr",
+    dependencies=[Depends(declares("credentials:read"))],
+)
 async def get_csr(
     credential_id: UUID,
     auth: AuthContext = Depends(require(Scope.CREDENTIALS)),  # noqa: B008
@@ -176,7 +189,9 @@ async def get_csr(
 
 
 @router.put(
-    "/credentials/{credential_id}/certificate", response_model=CredentialResponse
+    "/credentials/{credential_id}/certificate",
+    response_model=CredentialResponse,
+    dependencies=[Depends(declares("credentials:write"))],
 )
 async def install_certificate(
     credential_id: UUID,
@@ -200,7 +215,11 @@ async def install_certificate(
     return _to_response(credential_set)
 
 
-@router.post("/credentials/{credential_id}/renew", response_model=CredentialResponse)
+@router.post(
+    "/credentials/{credential_id}/renew",
+    response_model=CredentialResponse,
+    dependencies=[Depends(declares("credentials:write"))],
+)
 async def renew_credential(
     credential_id: UUID,
     request: Request,
@@ -216,7 +235,11 @@ async def renew_credential(
     return _to_response(successor)
 
 
-@router.delete("/credentials/{credential_id}", status_code=204)
+@router.delete(
+    "/credentials/{credential_id}",
+    status_code=204,
+    dependencies=[Depends(declares("credentials:write"))],
+)
 async def revoke_credential(
     credential_id: UUID,
     request: Request,
