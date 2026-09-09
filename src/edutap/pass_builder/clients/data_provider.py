@@ -4,19 +4,96 @@ import json
 from typing import Any
 
 import httpx
+from edutap.data_models.vocabulary import FieldKind
 from pydantic import BaseModel
 
 from ..errors import ProblemError
+from ..models.enums import ValueType
+
+#: What each of the provider's field kinds means for a mapping rule.
+#:
+#: The two vocabularies answer different questions. `FieldKind` says what a
+#: field is GOOD FOR -- it may serve as an NFC payload, a barcode message, a
+#: date -- and a field carries several kinds at once. `ValueType` says what a
+#: single rule BINDS. The translation therefore fans out, it does not reduce:
+#: a field that is STRING and DATETIME may honestly be bound as text or as a
+#: date, and rejecting either would be wrong.
+#:
+#: `NUMBER` and `BOOLEAN` are unreachable from here. The provider has no kind
+#: that means "a number", so no catalogue field can currently be bound as one.
+#: That is the provider's vocabulary talking, not an omission in this table.
+_KIND_VALUE_TYPES: dict[FieldKind, ValueType] = {
+    FieldKind.STRING: ValueType.TEXT,
+    FieldKind.TEXT: ValueType.TEXT,
+    FieldKind.NFC: ValueType.TEXT,
+    FieldKind.BARCODE: ValueType.TEXT,
+    FieldKind.DATETIME: ValueType.DATE,
+    FieldKind.LINK: ValueType.URI,
+    FieldKind.IMAGE: ValueType.IMAGE,
+}
+
+#: Which of the accepted types is the field's primary one, most general first.
+#:
+#: The primary type is what the cache row and the pass designer show; the full
+#: set is what a rule is validated against. Text wins whenever it is available
+#: because every wallet can render a value as text, so the most general answer
+#: is the least surprising one to see in a field list.
+_PRIMARY_PRECEDENCE: tuple[ValueType, ...] = (
+    ValueType.TEXT,
+    ValueType.DATE,
+    ValueType.IMAGE,
+    ValueType.URI,
+)
 
 
 class CatalogueField(BaseModel):
-    """One field the data provider can deliver."""
+    """One field the data provider can deliver.
+
+    Parsed from what `edutap.data_provider` actually sends: `key`, `kinds`,
+    `derived` and `description`. It sends no `value_type`, no `label` and no
+    `required` -- those are this service's own view of the field, derived here
+    or defaulted.
+
+    `kinds` is a list of plain strings rather than `list[FieldKind]` on
+    purpose. A kind this service does not know yet must not take the whole
+    catalogue down: the field still parses and keeps whatever its other kinds
+    allow. That is the failure this class exists to prevent -- see
+    `test_catalogue_parses_what_the_provider_actually_sends`.
+    """
 
     key: str
-    value_type: str
+    kinds: list[str] = []
+    derived: bool = False
     label: str | None = None
     required: bool = False
     description: str | None = None
+
+    @property
+    def accepted_value_types(self) -> set[ValueType]:
+        """Every value type a rule may legitimately bind this field as."""
+        types = {
+            _KIND_VALUE_TYPES[kind]
+            for raw in self.kinds
+            if (kind := _as_field_kind(raw)) is not None
+        }
+        return types or {ValueType.TEXT}
+
+    @property
+    def value_type(self) -> ValueType:
+        """The primary type, for the cache row and the field list."""
+        accepted = self.accepted_value_types
+        return next(
+            (candidate for candidate in _PRIMARY_PRECEDENCE if candidate in accepted),
+            ValueType.TEXT,
+        )
+
+
+def _as_field_kind(raw: str) -> FieldKind | None:
+    """Return the known kind for `raw`, or None if this service does not know it."""
+    try:
+        return FieldKind(raw)
+    except ValueError:
+        return None
 
 
 class DataProviderClient:

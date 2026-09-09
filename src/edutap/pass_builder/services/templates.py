@@ -14,6 +14,7 @@ from edutap.wallet_google.exceptions import ObjectAlreadyExistsException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..clients.data_provider import CatalogueField
 from ..engine.placeholders import scan_placeholders
 from ..engine.spec import RenderSpec, RuleSpec
 from ..errors import ProblemError
@@ -928,10 +929,29 @@ class TemplateService:
         )
         return list((await self._session.execute(query)).scalars().all())
 
-    async def _data_field_catalogue(self) -> dict[str, str]:
-        """Load the cached data-provider field catalogue as key -> value type."""
+    async def _data_field_catalogue(self) -> dict[str, set[str]]:
+        """Load the cached catalogue as key -> every type the field may be bound as.
+
+        The set, not the single `value_type`, is what a rule is checked
+        against: the provider describes a field by its kinds, and one field is
+        regularly good for several things at once. A row cached before the
+        `kinds` column existed has none, and falls back to its primary type --
+        which is what the old check compared against anyway.
+        """
         rows = (await self._session.execute(select(DataField))).scalars().all()
-        return {row.key: row.value_type.value for row in rows}
+        return {
+            row.key: (
+                {
+                    value_type.value
+                    for value_type in CatalogueField(
+                        key=row.key, kinds=row.kinds
+                    ).accepted_value_types
+                }
+                if row.kinds
+                else {row.value_type.value}
+            )
+            for row in rows
+        }
 
     async def _next_version_number(self, variant_id: UUID) -> int:
         """Return the next sequential version number for a variant."""

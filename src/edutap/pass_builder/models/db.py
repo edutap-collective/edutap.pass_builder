@@ -349,7 +349,16 @@ class DataField(Base, table=True):
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     key: str = Field(unique=True, index=True)
+    #: The primary type, shown in the field list and to the pass designer.
     value_type: ValueType = Field(sa_column=_enum_column(_value_type, nullable=False))
+    #: The provider's own kinds, kept verbatim.
+    #:
+    #: A rule is validated against every type these kinds allow, not against
+    #: `value_type` alone: a field that is STRING and DATETIME may honestly be
+    #: bound as text or as a date. Storing only the primary type would reject
+    #: one of the two. Empty for a row cached before this column existed --
+    #: `accepted_value_types` falls back to the primary type for those.
+    kinds: list[str] = Field(default_factory=list, sa_column=Column(ARRAY(String)))
     label: str
     required: bool = False
     description: str | None = None

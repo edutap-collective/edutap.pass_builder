@@ -9,6 +9,7 @@ from tests.dbschema import create_schema_and_tables
 
 from edutap.pass_builder.clients.data_provider import CatalogueField
 from edutap.pass_builder.models.db import AuditLog, DataField, Tenant
+from edutap.pass_builder.models.enums import ValueType
 from edutap.pass_builder.services.retention import (
     purge_expired_audit,
     refresh_catalogue,
@@ -73,10 +74,8 @@ async def test_purge_is_a_no_op_when_nothing_is_expired(session, seed_audit):
 async def test_refresh_catalogue_loads_the_fetched_fields(session):
     data_provider = FakeDataProvider(
         [
-            CatalogueField(key="person.name", value_type="text", label="Name"),
-            CatalogueField(
-                key="person.birthdate", value_type="date", label="Birthdate"
-            ),
+            CatalogueField(key="person.name", kinds=["STRING", "TEXT"]),
+            CatalogueField(key="person.birthdate", kinds=["STRING", "DATETIME"]),
         ]
     )
 
@@ -89,15 +88,33 @@ async def test_refresh_catalogue_loads_the_fetched_fields(session):
 
 async def test_refresh_catalogue_replaces_rather_than_duplicates(session):
     data_provider = FakeDataProvider(
-        [CatalogueField(key="person.name", value_type="text", label="Name")]
+        [CatalogueField(key="person.name", kinds=["STRING", "TEXT"])]
     )
     await refresh_catalogue(session, data_provider)
 
     data_provider.catalogue = [
-        CatalogueField(key="person.email", value_type="text", label="Email")
+        CatalogueField(key="person.email", kinds=["STRING", "TEXT", "LINK"])
     ]
     loaded = await refresh_catalogue(session, data_provider)
 
     assert loaded == 1
     rows = (await session.execute(select(DataField))).scalars().all()
     assert [row.key for row in rows] == ["person.email"]
+
+
+async def test_refresh_catalogue_keeps_the_kinds_and_falls_back_to_the_key(session):
+    """The cache row carries the provider's kinds, so validation can use them.
+
+    It also has to survive a catalogue that names no label: the provider sends
+    none at all, and a row whose label is empty would show a blank field list.
+    """
+    data_provider = FakeDataProvider(
+        [CatalogueField(key="pass_valid_until", kinds=["STRING", "TEXT", "DATETIME"])]
+    )
+
+    await refresh_catalogue(session, data_provider)
+
+    (row,) = (await session.execute(select(DataField))).scalars().all()
+    assert row.kinds == ["STRING", "TEXT", "DATETIME"]
+    assert row.value_type is ValueType.TEXT
+    assert row.label == "pass_valid_until"

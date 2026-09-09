@@ -34,7 +34,7 @@ async def test_readyz_is_503_when_data_provider_unreachable(client, data_provide
 async def test_refresh_fields_replaces_catalogue(client, session, data_provider):
     manager = await seed_client(session, [Scope.MANAGE])
     data_provider.catalogue = [
-        CatalogueField(key="person.name", value_type="text", label="Name")
+        CatalogueField(key="person.name", kinds=["STRING", "TEXT"], label="Name")
     ]
 
     response = await client.post(
