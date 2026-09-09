@@ -1,6 +1,9 @@
+from unittest import mock
+
 import httpx
 import pytest
 import respx
+from edutap.data_models.vocabulary import FieldKind
 
 from edutap.pass_builder.clients.data_provider import DataProviderClient
 from edutap.pass_builder.errors import ProblemError
@@ -197,3 +200,52 @@ async def test_a_field_without_kinds_is_text():
         (field,) = await make_client(http).fetch_catalogue()
     assert field.value_type is ValueType.TEXT
     assert field.accepted_value_types == {ValueType.TEXT}
+
+
+@respx.mock
+async def test_a_kind_this_service_does_not_map_yet_is_skipped_not_fatal():
+    """A new member of the shared vocabulary must not take the catalogue down.
+
+    Two ways a kind can be unknown here, and both have to degrade the same way. An
+    unknown *string* never reaches the mapping. But a kind that IS a `FieldKind` --
+    because `edutap.data_models` gained a member and this service has not been
+    rebuilt with a translation for it -- resolves to a real enum member, and a direct
+    dict lookup on it raises `KeyError` for the whole catalogue. That is the failure
+    this class exists to prevent, arriving through the other door.
+    """
+    from edutap.pass_builder.clients import data_provider as dp
+
+    mapping = dict(dp._KIND_VALUE_TYPES)
+    del mapping[FieldKind.IMAGE]  # stand in for a member added upstream since
+    with mock.patch.object(dp, "_KIND_VALUE_TYPES", mapping):
+        respx.get("http://dp/catalogue").mock(
+            return_value=httpx.Response(
+                200,
+                json=[
+                    {
+                        "key": "photo",
+                        "kinds": ["IMAGE"],
+                        "derived": False,
+                        "description": None,
+                    },
+                    {
+                        "key": "badge",
+                        "kinds": ["IMAGE", "TEXT"],
+                        "derived": False,
+                        "description": None,
+                    },
+                ],
+            )
+        )
+        async with httpx.AsyncClient() as http:
+            photo, badge = await make_client(http).fetch_catalogue()
+
+        # Read INSIDE the patch: the types are derived when asked for, not at parse
+        # time -- which is also where the KeyError bites, in refresh_catalogue and in
+        # the template service's catalogue loader rather than in fetch_catalogue.
+        #
+        # Nothing left to map: text, because every wallet can render a value as text.
+        assert photo.accepted_value_types == {ValueType.TEXT}
+        assert photo.value_type is ValueType.TEXT
+        # One kind unmapped, one mapped: the mapped one survives on its own.
+        assert badge.accepted_value_types == {ValueType.TEXT}

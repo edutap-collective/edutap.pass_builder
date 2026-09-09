@@ -70,11 +70,21 @@ class CatalogueField(BaseModel):
 
     @property
     def accepted_value_types(self) -> set[ValueType]:
-        """Every value type a rule may legitimately bind this field as."""
+        """Every value type a rule may legitimately bind this field as.
+
+        A kind can be unknown here in two ways and both have to degrade alike. An
+        unknown *string* never resolves to a `FieldKind`. But a kind that IS a
+        `FieldKind` -- because `edutap.data_models` gained a member and this table has
+        not caught up -- resolves fine, and a direct lookup on it would raise
+        `KeyError` for the whole catalogue at the moment the cache is refreshed. So the
+        mapping is consulted with `.get` and an unmapped kind is skipped like an
+        unknown one.
+        """
         types = {
-            _KIND_VALUE_TYPES[kind]
+            value_type
             for raw in self.kinds
             if (kind := _as_field_kind(raw)) is not None
+            and (value_type := _KIND_VALUE_TYPES.get(kind)) is not None
         }
         return types or {ValueType.TEXT}
 
