@@ -166,7 +166,8 @@ version, and has no per-person component:
 ## Field catalogue and audit
 
 ```text
-data_field  id, key, value_type, label, required, description, fetched_at
+data_field  id, key, value_type, kinds text[], label, required,
+            description, fetched_at
             UNIQUE (key)
 
 audit_log   id, tenant_id, ts, request_id, actor_client_id,
@@ -181,6 +182,20 @@ audit_log   id, tenant_id, ts, request_id, actor_client_id,
 Every `mapping_rule.source_field` is validated against it on save, so a
 wrong field name or a type conflict fails at authoring time rather than at
 the five-hundredth render.
+
+The provider does not send a `value_type`. It describes a field by its
+**kinds** — `STRING`, `TEXT`, `DATETIME`, `LINK`, `NFC`, `BARCODE`, `IMAGE`
+from `edutap.data_models` — which say what the field is *good for*, and a
+field carries several at once. `kinds` keeps that list verbatim; `value_type`
+is the primary type derived from it, and it is what a field list and the pass
+designer show.
+
+A rule is validated against **every** type those kinds allow, not against
+`value_type` alone. `pass_valid_until` arrives as `STRING, TEXT, DATETIME`,
+and binding it as a date or rendering it as text are both correct; a check
+against a single derived type would reject one of the two, and no choice of
+"the" type is right for every field. `NUMBER` and `BOOLEAN` are unreachable
+from the provider's vocabulary: it has no kind meaning "a number".
 
 `audit_log` records one entry per call with an effect, including failures.
 Actions in use: `pass.create`, `pass.update`, `pass.save_link`,

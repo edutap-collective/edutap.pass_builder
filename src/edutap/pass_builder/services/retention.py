@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..clients.data_provider import CatalogueField
 from ..models.db import AuditLog, DataField
-from ..models.enums import ValueType
 
 
 class SupportsFetchCatalogue(Protocol):
@@ -57,7 +56,8 @@ async def refresh_catalogue(
         session.add(
             DataField(
                 key=entry.key,
-                value_type=ValueType(entry.value_type),
+                value_type=entry.value_type,
+                kinds=list(entry.kinds),
                 label=entry.label or entry.key,
                 required=entry.required,
                 description=entry.description,

@@ -1,9 +1,13 @@
+from unittest import mock
+
 import httpx
 import pytest
 import respx
+from edutap.data_models.vocabulary import FieldKind
 
 from edutap.pass_builder.clients.data_provider import DataProviderClient
 from edutap.pass_builder.errors import ProblemError
+from edutap.pass_builder.models.enums import ValueType
 
 
 def make_client(http: httpx.AsyncClient) -> DataProviderClient:
@@ -110,3 +114,138 @@ async def test_no_view_per_call_means_the_clients_default():
     async with httpx.AsyncClient() as http:
         await make_client(http).fetch_fields("u1", ["person.name"], view_type=None)
     assert b'"view_type":"full_view"' in route.calls.last.request.content
+
+
+@respx.mock
+async def test_catalogue_parses_what_the_provider_actually_sends():
+    """The provider describes a field by its KINDS, never by a `value_type`.
+
+    Measured against `ghcr.io/edutap-collective/edutap.data_provider:latest` on
+    2026-09-09: `GET /catalogue?view_type=full_view` answers rows shaped
+    `{"key", "kinds": [...], "derived": bool, "description"}`. This client used
+    to declare `value_type` as a required field, so every non-empty catalogue
+    raised a pydantic `ValidationError` inside `POST /fields/refresh` -- and the
+    only test of the call passed an EMPTY list, which is why nothing caught it.
+    Without the cache, every `PUT mappings` then answers `422 unknown field`.
+    """
+    rows = [
+        {
+            "key": "eduperson_principal_name",
+            "kinds": ["STRING", "TEXT", "NFC"],
+            "derived": False,
+            "description": None,
+        },
+        {
+            "key": "pass_valid_until",
+            "kinds": ["STRING", "TEXT", "DATETIME"],
+            "derived": True,
+            "description": "At most seven days ahead",
+        },
+    ]
+    respx.get("http://dp/catalogue").mock(return_value=httpx.Response(200, json=rows))
+    async with httpx.AsyncClient() as http:
+        fields = await make_client(http).fetch_catalogue()
+
+    assert [field.key for field in fields] == [
+        "eduperson_principal_name",
+        "pass_valid_until",
+    ]
+    assert fields[1].derived is True
+    assert fields[1].description == "At most seven days ahead"
+
+
+@respx.mock
+async def test_catalogue_field_offers_every_type_its_kinds_allow():
+    """A field is good for several things at once, so several types fit it.
+
+    `pass_valid_until` is STRING, TEXT and DATETIME: an author may bind it as a
+    date or render it as text, and both are correct. Reducing the kinds to one
+    value type would reject one of those two -- which one depending on the
+    order chosen, and neither order is right for every field.
+
+    `value_type` remains the single primary type the cache and the pass designer
+    need; `accepted_value_types` is what a mapping rule is validated against.
+    """
+    rows = [
+        {"key": "photo", "kinds": ["IMAGE"], "derived": False, "description": None},
+        {"key": "homepage", "kinds": ["LINK"], "derived": False, "description": None},
+        {
+            "key": "valid_until",
+            "kinds": ["STRING", "DATETIME"],
+            "derived": False,
+            "description": None,
+        },
+    ]
+    respx.get("http://dp/catalogue").mock(return_value=httpx.Response(200, json=rows))
+    async with httpx.AsyncClient() as http:
+        photo, homepage, valid_until = await make_client(http).fetch_catalogue()
+
+    assert photo.value_type is ValueType.IMAGE
+    assert photo.accepted_value_types == {ValueType.IMAGE}
+    assert homepage.value_type is ValueType.URI
+    assert valid_until.accepted_value_types == {ValueType.TEXT, ValueType.DATE}
+    assert valid_until.value_type is ValueType.TEXT
+
+
+@respx.mock
+async def test_a_field_without_kinds_is_text():
+    """An empty kinds list is not an error: text is what every wallet can show."""
+    respx.get("http://dp/catalogue").mock(
+        return_value=httpx.Response(
+            200,
+            json=[{"key": "bare", "kinds": [], "derived": False, "description": None}],
+        )
+    )
+    async with httpx.AsyncClient() as http:
+        (field,) = await make_client(http).fetch_catalogue()
+    assert field.value_type is ValueType.TEXT
+    assert field.accepted_value_types == {ValueType.TEXT}
+
+
+@respx.mock
+async def test_a_kind_this_service_does_not_map_yet_is_skipped_not_fatal():
+    """A new member of the shared vocabulary must not take the catalogue down.
+
+    Two ways a kind can be unknown here, and both have to degrade the same way. An
+    unknown *string* never reaches the mapping. But a kind that IS a `FieldKind` --
+    because `edutap.data_models` gained a member and this service has not been
+    rebuilt with a translation for it -- resolves to a real enum member, and a direct
+    dict lookup on it raises `KeyError` for the whole catalogue. That is the failure
+    this class exists to prevent, arriving through the other door.
+    """
+    from edutap.pass_builder.clients import data_provider as dp
+
+    mapping = dict(dp._KIND_VALUE_TYPES)
+    del mapping[FieldKind.IMAGE]  # stand in for a member added upstream since
+    with mock.patch.object(dp, "_KIND_VALUE_TYPES", mapping):
+        respx.get("http://dp/catalogue").mock(
+            return_value=httpx.Response(
+                200,
+                json=[
+                    {
+                        "key": "photo",
+                        "kinds": ["IMAGE"],
+                        "derived": False,
+                        "description": None,
+                    },
+                    {
+                        "key": "badge",
+                        "kinds": ["IMAGE", "TEXT"],
+                        "derived": False,
+                        "description": None,
+                    },
+                ],
+            )
+        )
+        async with httpx.AsyncClient() as http:
+            photo, badge = await make_client(http).fetch_catalogue()
+
+        # Read INSIDE the patch: the types are derived when asked for, not at parse
+        # time -- which is also where the KeyError bites, in refresh_catalogue and in
+        # the template service's catalogue loader rather than in fetch_catalogue.
+        #
+        # Nothing left to map: text, because every wallet can render a value as text.
+        assert photo.accepted_value_types == {ValueType.TEXT}
+        assert photo.value_type is ValueType.TEXT
+        # One kind unmapped, one mapped: the mapped one survives on its own.
+        assert badge.accepted_value_types == {ValueType.TEXT}
