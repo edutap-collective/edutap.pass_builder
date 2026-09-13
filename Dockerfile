@@ -3,6 +3,25 @@
 # Its own stage so the runtime image never carries a Node toolchain, and so a
 # Python-only change does not invalidate it: the frontend layers are cached on
 # `frontend/` alone.
+# ONE PLACE FOR THE PYTHON VERSION. Both stages and the copied path below are
+# derived from this argument, because they have to agree: `pip install` puts the
+# package under the interpreter's own directory, and the runtime stage copies
+# from exactly there.
+#
+# Keeping them in separate literals is what broke the build of
+# edutap.webhook_heidi on 2026-09-13: Renovate raised the `FROM python:` lines
+# -- correctly, that is its job -- while the hard-coded
+# `/usr/local/lib/python3.13/site-packages` in the COPY stayed behind, and the
+# build failed with `failed to compute cache key: ... not found`. It failed at
+# the next build, not at the merge.
+#
+# This file had the same shape and would have broken the same way at the next
+# version bump. Nothing was wrong with it today -- that is exactly what made it
+# worth changing.
+#
+# renovate: datasource=docker depName=python versioning=docker
+ARG PYTHON_VERSION=3.14
+
 FROM node:24-slim AS frontend
 WORKDIR /frontend
 RUN corepack enable
@@ -24,7 +43,7 @@ ARG EDUTAP_PASS_BUILDER_UI_ROOT_PATH=/portale/edutap-pass-builder
 ENV EDUTAP_PASS_BUILDER_UI_ROOT_PATH=${EDUTAP_PASS_BUILDER_UI_ROOT_PATH}
 RUN pnpm build
 
-FROM python:3.14-slim AS build
+FROM python:${PYTHON_VERSION}-slim AS build
 WORKDIR /app
 RUN pip install --no-cache-dir uv
 COPY pyproject.toml README.md ./
@@ -34,9 +53,13 @@ COPY src ./src
 COPY --from=frontend /src/edutap/pass_builder/ui/static ./src/edutap/pass_builder/ui/static
 RUN uv pip install --system --no-cache .
 
-FROM python:3.14-slim
+FROM python:${PYTHON_VERSION}-slim
+# An ARG declared before the first FROM is outside every build stage; naming
+# it again here brings it into this one. Without this line the substitution
+# below would silently expand to an empty string.
+ARG PYTHON_VERSION
 RUN useradd --create-home --uid 10001 app
-COPY --from=build /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=build /usr/local/lib/python${PYTHON_VERSION}/site-packages /usr/local/lib/python${PYTHON_VERSION}/site-packages
 COPY --from=build /usr/local/bin /usr/local/bin
 COPY assets /app/assets
 COPY migrations /app/migrations
