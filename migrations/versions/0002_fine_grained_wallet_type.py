@@ -27,6 +27,10 @@ down_revision: str | Sequence[str] | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+#: Siehe 0001: nicht aus dem Paket importiert, weil eine Migration das Schema
+#: beschreibt, wie es zu ihrer Zeit war.
+SCHEMA = "pass_builder"
+
 
 #: The members of `edutap.data_models.vocabulary.WalletType`, written out.
 #:
@@ -87,17 +91,22 @@ def _swap_enum(values: tuple[str, ...], mapping: dict[str, str]) -> None:
     through the mapping. Done in one migration, so no state in between is visible to
     anything else.
     """
+    # JEDER NAME QUALIFIZIERT. `env.py` pinnt den `search_path` waehrend der
+    # Migration auf das Default-Schema (`reflection_search_path`), damit die
+    # Reflexion fremde Tabellen nicht unqualifiziert zurueckgibt. Ein
+    # unqualifiziertes `DROP TYPE wallet_type` sucht damit in `public` -- und der
+    # Typ liegt seit 0001 in `pass_builder`.
     for table, column in _COLUMNS:
-        op.execute(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE text")
+        op.execute(f"ALTER TABLE {SCHEMA}.{table} ALTER COLUMN {column} TYPE text")
 
-    op.execute("DROP TYPE wallet_type")
+    op.execute(f"DROP TYPE {SCHEMA}.wallet_type")
     members = ", ".join(f"'{value}'" for value in values)
-    op.execute(f"CREATE TYPE wallet_type AS ENUM ({members})")
+    op.execute(f"CREATE TYPE {SCHEMA}.wallet_type AS ENUM ({members})")
 
     for table, column in _COLUMNS:
         op.execute(
-            f"ALTER TABLE {table} ALTER COLUMN {column} TYPE wallet_type "
-            f"USING ({_case(mapping, column)})::wallet_type"
+            f"ALTER TABLE {SCHEMA}.{table} ALTER COLUMN {column} TYPE {SCHEMA}.wallet_type "
+            f"USING ({_case(mapping, column)})::{SCHEMA}.wallet_type"
         )
 
 
@@ -114,7 +123,8 @@ def downgrade() -> None:
     the cast fail -- deliberately, because inventing one would be worse.
     """
     unmapped = sa.text(
-        "SELECT count(*) FROM template_variant WHERE wallet_type::text = 'EUDI_PASS'"
+        f"SELECT count(*) FROM {SCHEMA}.template_variant "
+        "WHERE wallet_type::text = 'EUDI_PASS'"
     )
     if op.get_bind().execute(unmapped).scalar():
         raise RuntimeError(

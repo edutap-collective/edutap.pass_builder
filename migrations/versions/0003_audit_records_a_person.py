@@ -30,6 +30,9 @@ down_revision: str | Sequence[str] | None = "0002"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+#: Siehe 0001. Ab dieser Revision tragen alle Migrationen das Schema.
+SCHEMA = "pass_builder"
+
 _TABLE = "audit_log"
 _COLUMN = "actor_principal"
 _INDEX = "ix_audit_log_actor_principal"
@@ -37,8 +40,8 @@ _INDEX = "ix_audit_log_actor_principal"
 
 def upgrade() -> None:
     """Add the person actor and an index for asking "what did X do"."""
-    op.add_column(_TABLE, sa.Column(_COLUMN, sa.String(), nullable=True))
-    op.create_index(_INDEX, _TABLE, [_COLUMN])
+    op.add_column(_TABLE, sa.Column(_COLUMN, sa.String(), nullable=True), schema=SCHEMA)
+    op.create_index(_INDEX, _TABLE, [_COLUMN], schema=SCHEMA)
 
 
 def downgrade() -> None:
@@ -48,5 +51,5 @@ def downgrade() -> None:
     stay, and they then look like the entries this column was added to stop
     producing.
     """
-    op.drop_index(_INDEX, table_name=_TABLE)
-    op.drop_column(_TABLE, _COLUMN)
+    op.drop_index(_INDEX, table_name=_TABLE, schema=SCHEMA)
+    op.drop_column(_TABLE, _COLUMN, schema=SCHEMA)
