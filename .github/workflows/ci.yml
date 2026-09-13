@@ -24,7 +24,7 @@ jobs:
       # uv reads this, so no step needs a version-specific flag.
       UV_PYTHON: "3.14"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -73,7 +73,7 @@ jobs:
   image:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the application image
         run: docker build -t pass-builder:ci .
