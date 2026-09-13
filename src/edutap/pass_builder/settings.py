@@ -117,6 +117,23 @@ class Settings(BaseSettings):
     secret_master_key: SecretStr
     """Base64 encoded 32 byte AES key wrapping the per-secret data keys."""
 
+    apple_authentication_secret: SecretStr = SecretStr("")
+    """Issuer secret from which each pass's `authenticationToken` is derived.
+
+    THE SAME VALUE THE VERIFIER HOLDS. `edutap.wallet_apple_vas_web_service`
+    recomputes the token on every update request; a value only one side knows
+    locks every device out. It reaches this service as a Docker secret, so the
+    file is `/run/secrets/EDUTAP_PASS_BUILDER_apple_authentication_secret`.
+
+    EMPTY IS ALLOWED, and it means "write no token". A deployment that issues no
+    Apple passes -- or a test -- must not be forced to invent one. Where Apple
+    passes ARE issued, an empty value produces a pass without
+    `authenticationToken`: Apple then omits the `Authorization` header, the
+    verifier rejects the request, and the pass never updates. That is why
+    `tests/test_apple_token.py` and the render tests pin the wiring rather than
+    trusting that somebody set it.
+    """
+
     data_provider_base_url: str
     data_provider_token: SecretStr = SecretStr("")
     data_provider_timeout: float = 10.0

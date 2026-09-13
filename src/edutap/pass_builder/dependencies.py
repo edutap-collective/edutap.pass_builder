@@ -137,4 +137,5 @@ def get_render_service(
         data_provider,
         images=images,
         wwdr_certificate_path=settings.wwdr_certificate_path,
+        authentication_secret=settings.apple_authentication_secret.get_secret_value(),
     )

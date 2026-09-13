@@ -199,6 +199,7 @@ class RenderService:
         wwdr_certificate_path: Path = Settings.model_fields[
             "wwdr_certificate_path"
         ].default,
+        authentication_secret: str = "",
     ) -> None:
         """Bind the service to its collaborators.
 
@@ -228,6 +229,11 @@ class RenderService:
         self._google_api: SupportsGoogleApi = google_api or wallet_google_api
         self._apple_sign_override = apple_sign
         self._wwdr_certificate_path = wwdr_certificate_path
+
+        # Leer heisst 'kein Token schreiben'. Ein Deployment ohne Apple-Paesse
+        # soll keines erfinden muessen; wo Apple-Paesse ausgegeben werden, sperrt
+        # ein leerer Wert jedes Geraet aus -- siehe engine/apple_token.py.
+        self._authentication_secret = authentication_secret
 
     async def create_pass(
         self,
@@ -867,7 +873,13 @@ class RenderService:
             bound = await resolve_image_references(bound, self._images)
             sign = await self._apple_signer(tenant_id, variant.credential_set_id)
             try:
-                pkpass = build_apple(spec, bound, serial_number=pass_id, sign=sign)
+                pkpass = build_apple(
+                    spec,
+                    bound,
+                    serial_number=pass_id,
+                    sign=sign,
+                    authentication_secret=self._authentication_secret,
+                )
             except NfcPayloadTooLongError as exc:
                 # Never include the payload value itself -- only its length
                 # is on the exception, and even that stays out of the
