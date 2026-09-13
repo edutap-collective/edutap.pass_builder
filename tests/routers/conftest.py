@@ -40,6 +40,7 @@ from edutap.pass_builder.clients.data_provider import CatalogueField
 from edutap.pass_builder.database import get_session
 from edutap.pass_builder.dependencies import (
     get_data_provider,
+    get_data_provider_factory,
     get_image_service,
     get_objectstore,
 )
@@ -149,6 +150,13 @@ def app(session, objectstore, data_provider, image_service):
     application.dependency_overrides[get_session] = override_get_session
     application.dependency_overrides[get_objectstore] = lambda: objectstore
     application.dependency_overrides[get_data_provider] = lambda: data_provider
+    # Die Fabrik, die `POST /fields/refresh` benutzt: Sie baut je View einen Client,
+    # und hier liefert sie fuer jeden View denselben Doppelgaenger. Ohne diesen
+    # Override griffe die echte Fabrik auf `request.app.state.http` zu, das ohne
+    # laufenden lifespan nicht existiert.
+    application.dependency_overrides[get_data_provider_factory] = lambda: (
+        lambda view_type: data_provider
+    )
     application.dependency_overrides[get_image_service] = lambda: image_service
     return application
 

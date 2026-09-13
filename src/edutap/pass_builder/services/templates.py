@@ -228,7 +228,7 @@ class TemplateService:
                 409, "version_not_draft", "Only draft versions accept mapping changes"
             )
 
-        catalogue = await self._data_field_catalogue()
+        catalogue = await self._data_field_catalogue(await self._view_type_of(version))
         problems = validate_mapping_rules(rules, catalogue)
         if problems:
             raise ProblemError(
@@ -719,7 +719,7 @@ class TemplateService:
         problems: list[str] = []
         problems.extend(self._check_platform_payload(version, variant))
 
-        catalogue = await self._data_field_catalogue()
+        catalogue = await self._data_field_catalogue(await self._view_type_of(version))
         authored_rules = [
             _mapping_rule_to_spec(row) for row in await self._rules_for(version.id)
         ]
@@ -929,8 +929,31 @@ class TemplateService:
         )
         return list((await self._session.execute(query)).scalars().all())
 
-    async def _data_field_catalogue(self) -> dict[str, set[str]]:
-        """Load the cached catalogue as key -> every type the field may be bound as.
+    async def _view_type_of(self, version: TemplateVersion) -> str | None:
+        """Return the view the template behind this version reads, or None.
+
+        None means the deployment default, the convention `Template.view_type`
+        sets. Looked up rather than passed in, because every caller already has
+        the version and none of them has a reason to know about views.
+        """
+        # SQLModel columns read as plain Python types to ty rather than as typed
+        # SQLAlchemy columns, so it picks the single-argument `select` overload --
+        # the same reason `auth.py` gives for the same ignore.
+        query = (
+            select(Template.view_type)  # ty: ignore[no-matching-overload]
+            .join(TemplateVariant, TemplateVariant.template_id == Template.id)
+            .where(TemplateVariant.id == version.variant_id)
+        )
+        return (await self._session.execute(query)).scalar_one_or_none()
+
+    async def _data_field_catalogue(self, view_type: str | None) -> dict[str, set[str]]:
+        """Load one view's cached catalogue as key -> every type it may be bound as.
+
+        ONE VIEW, NOT THE WHOLE CACHE, and that is the point of the argument.
+        `Template.view_type` gives every template its own view; a cache read
+        without that filter validated a mensapass rule against `full_view` and
+        answered `unknown field` for a field the provider does offer -- in the
+        view the template actually reads.
 
         The set, not the single `value_type`, is what a rule is checked
         against: the provider describes a field by its kinds, and one field is
@@ -938,7 +961,15 @@ class TemplateService:
         `kinds` column existed has none, and falls back to its primary type --
         which is what the old check compared against anyway.
         """
-        rows = (await self._session.execute(select(DataField))).scalars().all()
+        query = select(DataField).where(
+            # `is_(None)` rather than `== None`: SQL equality against NULL is
+            # never true, so a deployment that never named a view would validate
+            # every rule against an EMPTY catalogue -- every field unknown.
+            DataField.view_type.is_(None)  # ty: ignore[unresolved-attribute]
+            if view_type is None
+            else DataField.view_type == view_type  # ty: ignore[invalid-argument-type]
+        )
+        rows = (await self._session.execute(query)).scalars().all()
         return {
             row.key: (
                 {

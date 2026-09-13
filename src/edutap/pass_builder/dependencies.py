@@ -8,6 +8,7 @@ created once at application startup rather than per request, so
 one on every call.
 """
 
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import Depends, Request
@@ -37,6 +38,40 @@ def get_data_provider(request: Request, settings: SettingsDep) -> DataProviderCl
         client=request.app.state.http,
         view_type=settings.data_provider_view_type,
     )
+
+
+#: Builds a data-provider client for ONE view.
+#:
+#: A factory and not a client, because `POST /fields/refresh` needs several: the
+#: provider serves one view per call, and a deployment reads as many views as its
+#: templates name. A dependency that returned a finished client could only ever offer
+#: the deployment default.
+#:
+#: Still a DEPENDENCY rather than a direct construction in the route, and that is the
+#: point of it: `dependency_overrides` is how a test replaces the provider, and a route
+#: that reached into `request.app.state` itself would be untestable without a running
+#: lifespan.
+DataProviderFactory = Callable[[str | None], DataProviderClient]
+
+
+def get_data_provider_factory(
+    request: Request, settings: SettingsDep
+) -> DataProviderFactory:
+    """Return a factory that builds a client per view."""
+
+    def build(view_type: str | None) -> DataProviderClient:
+        return DataProviderClient(
+            base_url=settings.data_provider_base_url,
+            token=settings.data_provider_token.get_secret_value(),
+            timeout=settings.data_provider_timeout,
+            client=request.app.state.http,
+            # `None` means the deployment default, and it is resolved the same way
+            # `get_data_provider` resolves it -- so the two cannot disagree about what
+            # "default" means.
+            view_type=view_type or settings.data_provider_view_type,
+        )
+
+    return build
 
 
 def get_image_service(request: Request, settings: SettingsDep) -> ImageServiceClient:
