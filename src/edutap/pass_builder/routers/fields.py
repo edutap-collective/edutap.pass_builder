@@ -6,13 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..admin.permissions import declares
 from ..auth import AuthContext, require
-from ..clients.data_provider import DataProviderClient
 from ..database import get_session
-from ..dependencies import get_data_provider
+from ..dependencies import DataProviderFactory, get_data_provider_factory
 from ..models.api import CatalogueExport, FieldResponse
 from ..models.db import DataField
 from ..models.enums import Scope
-from ..services.retention import refresh_catalogue
+from ..services.retention import refresh_catalogue, views_in_use
 
 router = APIRouter(tags=["fields"])
 
@@ -50,10 +49,25 @@ async def list_fields(
 async def refresh_fields(
     auth: AuthContext = Depends(require(Scope.MANAGE)),  # noqa: B008
     session: AsyncSession = Depends(get_session),  # noqa: B008
-    data_provider: DataProviderClient = Depends(get_data_provider),  # noqa: B008
+    build_provider: DataProviderFactory = Depends(get_data_provider_factory),  # noqa: B008
 ) -> list[FieldResponse]:
-    """Replace the cached catalogue from `data_provider` and return it."""
-    await refresh_catalogue(session, data_provider)
+    """Replace the cached catalogue of EVERY view in use, and return all of it.
+
+    EVERY VIEW, NOT THE DEPLOYMENT DEFAULT. `Template.view_type` gives each template
+    its own view, and a rule is validated against the catalogue of ITS view. A refresh
+    that covered only the default left every other view with an empty catalogue, and
+    every rule against them failed as `unknown field` -- for fields the provider does
+    offer.
+
+    ONE CLIENT PER VIEW, from an injected FACTORY. `get_data_provider` hands out the
+    client for the deployment default, because that is what a render needs; this
+    endpoint is the one caller that needs several, and the provider serves one view per
+    call. The factory stays a dependency so a test can still replace the provider --
+    building the client in the route would have reached into `request.app.state` and
+    made this endpoint untestable without a running lifespan.
+    """
+    for view_type in await views_in_use(session):
+        await refresh_catalogue(session, build_provider(view_type), view_type=view_type)
     rows = (await session.execute(select(DataField))).scalars().all()
     return [_to_response(row) for row in rows]
 

@@ -72,13 +72,16 @@ async def seed_variant(
     key: str = "student",
     is_default: bool = True,
     credential_set_id: UUID | None = None,
+    view_type: str | None = None,
 ) -> SeededVariant:
     """Create a tenant, template and one variant for it."""
     tenant = Tenant(key=f"tenant-{uuid4().hex[:8]}", name="Tenant")
     session.add(tenant)
     await session.flush()
 
-    template = Template(tenant_id=tenant.id, key="student-id", name="Student ID")
+    template = Template(
+        tenant_id=tenant.id, key="student-id", name="Student ID", view_type=view_type
+    )
     session.add(template)
     await session.flush()
 
@@ -715,3 +718,81 @@ async def test_publish_rejects_an_image_target_on_a_google_variant(
         await svc.publish(seeded.tenant_id, version.id)
     findings = excinfo.value.extra["findings"]
     assert any("not supported on a google variant" in f for f in findings)
+
+
+# --- a rule is validated against ITS template's view --------------------------
+
+
+async def test_a_rule_is_checked_against_the_view_its_template_reads(
+    session, objectstore
+):
+    """The defect this whole change exists for.
+
+    `Template.view_type` gives every template its own view, but the field cache was
+    one flat namespace for the deployment. A mensapass rule was therefore checked
+    against `full_view` and answered `422 unknown field` -- for a field the provider
+    does offer, in the view the template actually reads.
+    """
+    seeded = await seed_variant(session, view_type="mensapass")
+    version = await a_draft_apple_version(session, seeded)
+    session.add(
+        DataField(
+            key="role", view_type="mensapass", value_type=ValueType.TEXT, label="Rolle"
+        )
+    )
+    await session.flush()
+    svc = TemplateService(session, objectstore)
+
+    await svc.set_mappings(seeded.tenant_id, version.id, [a_rule("role")])
+
+    rules = await svc._rules_for(version.id)  # noqa: SLF001 - white-box check
+    assert [r.source_field for r in rules] == ["role"]
+
+
+async def test_a_field_of_another_view_is_not_accepted(session, objectstore):
+    """The other half: the cache must not leak across views.
+
+    Without the filter every field of every view would validate, and a rule would be
+    accepted that renders nothing -- the provider never serves that field for this
+    template's view.
+    """
+    seeded = await seed_variant(session, view_type="mensapass")
+    version = await a_draft_apple_version(session, seeded)
+    session.add(
+        DataField(
+            key="given_name",
+            view_type="full_view",
+            value_type=ValueType.TEXT,
+            label="Vorname",
+        )
+    )
+    await session.flush()
+    svc = TemplateService(session, objectstore)
+
+    with pytest.raises(ProblemError) as excinfo:
+        await svc.set_mappings(seeded.tenant_id, version.id, [a_rule("given_name")])
+    assert excinfo.value.status == 422
+    assert excinfo.value.slug == "invalid_mapping"
+
+
+async def test_a_template_without_a_view_reads_the_default_cache(session, objectstore):
+    """`view_type IS NULL` means the deployment default; `None` marks it in the cache.
+
+    This is the common case, and it is the one a naive `== None` in SQL would break:
+    equality against NULL is never true, so every rule of every such template would
+    have been validated against an EMPTY catalogue.
+    """
+    seeded = await seed_variant(session)  # kein view_type
+    version = await a_draft_apple_version(session, seeded)
+    session.add(
+        DataField(
+            key="person.name", view_type=None, value_type=ValueType.TEXT, label="Name"
+        )
+    )
+    await session.flush()
+    svc = TemplateService(session, objectstore)
+
+    await svc.set_mappings(seeded.tenant_id, version.id, [a_rule("person.name")])
+
+    rules = await svc._rules_for(version.id)  # noqa: SLF001 - white-box check
+    assert [r.source_field for r in rules] == ["person.name"]

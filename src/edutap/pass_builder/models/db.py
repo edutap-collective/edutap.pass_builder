@@ -343,12 +343,37 @@ class MappingRule(Base, table=True):
 
 
 class DataField(Base, table=True):
-    """A cached entry from the data_provider field catalogue."""
+    """A cached entry from the data_provider field catalogue, for ONE view."""
 
     __tablename__ = "data_field"
+    __table_args__ = (
+        # `(view_type, key)`, not `key` alone. One deployment reads several views --
+        # the student card `full_view`, the canteen pass `mensapass` -- and the same
+        # key may honestly appear in more than one of them. A unique `key` made the
+        # cache a single flat namespace for the whole deployment, which is what broke
+        # validation: a mensapass rule was checked against `full_view` and answered
+        # `unknown field` for a field the provider does offer, in the view its
+        # template actually reads.
+        #
+        # Postgres treats NULLs as distinct here, so two rows with `view_type IS NULL`
+        # and the same key would both be accepted. In practice there are none:
+        # `refresh_catalogue` writes the view it fetched, and `None` only ever means
+        # "the deployment default" for a row written before this column existed.
+        UniqueConstraint("view_type", "key"),
+        Index("ix_data_field_view_type_key", "view_type", "key"),
+    )
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
-    key: str = Field(unique=True, index=True)
+    key: str = Field(index=True)
+
+    #: Which of the provider's views this entry describes, or None.
+    #:
+    #: None means the deployment's default (`DATA_PROVIDER_VIEW_TYPE`), exactly as
+    #: `Template.view_type` uses it. Nullable and WITHOUT a server default, for the
+    #: same reason stated there: a NOT NULL column cannot be added to a table that
+    #: holds rows -- that is what broke `tenant.active` on 2026-09-06 -- and a server
+    #: default would silently pin every cached field to one named view.
+    view_type: str | None = None
     #: The primary type, shown in the field list and to the pass designer.
     value_type: ValueType = Field(sa_column=_enum_column(_value_type, nullable=False))
     #: The provider's own kinds, kept verbatim.
