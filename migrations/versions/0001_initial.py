@@ -19,6 +19,24 @@ down_revision: str | Sequence[str] | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+#: Das Schema, das dieses Paket besitzt.
+#:
+#: URSPRUENGLICH FEHLTE ES UEBERALL. Autogenerate hat diese Revision ohne `schema=`
+#: geschrieben, also legte sie jede Tabelle, jeden Index und jeden Enum-Typ im
+#: Default-Schema an -- `public`. Ab 0004 qualifizieren die Migrationen dagegen mit
+#: `schema="pass_builder"`, und 0004 brach folgerichtig ab mit
+#: `relation "pass_builder.tenant" does not exist`.
+#:
+#: Aufgefallen ist das erst am 2026-09-13, weil `migrations/env.py` bis dahin nie
+#: committet hat (PR #39): Jeder Lauf meldete Erfolg und wurde zurueckgerollt, die
+#: Kette wurde also nie wirklich bis 0004 gefahren. Kein Bestand ist betroffen -- es
+#: gibt keine Datenbank, die je aus dieser Revision entstanden ist.
+#:
+#: Nicht aus dem Paket importiert: Eine Migration beschreibt das Schema, wie es zu
+#: ihrer Zeit war. Ein Import wuerde sie mitwandern lassen, wenn sich die Konstante
+#: im Paket aendert -- dieselbe Begruendung steht in 0002.
+SCHEMA = "pass_builder"
+
 
 def upgrade() -> None:
     """Upgrade schema."""
@@ -26,23 +44,25 @@ def upgrade() -> None:
     op.create_table('data_field',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('key', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('value_type', sa.Enum('text', 'date', 'number', 'boolean', 'image', 'uri', name='value_type'), nullable=False),
+    sa.Column('value_type', sa.Enum('text', 'date', 'number', 'boolean', 'image', 'uri', name='value_type', schema=SCHEMA), nullable=False),
     sa.Column('label', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('required', sa.Boolean(), nullable=False),
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('fetched_at', sa.DateTime(timezone=True), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_data_field_key'), 'data_field', ['key'], unique=True)
+    op.create_index(op.f('ix_data_field_key'), 'data_field', ['key'], unique=True, schema=SCHEMA)
     op.create_table('tenant',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('key', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_tenant_key'), 'tenant', ['key'], unique=True)
+    op.create_index(op.f('ix_tenant_key'), 'tenant', ['key'], unique=True, schema=SCHEMA)
     op.create_table('api_client',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('tenant_id', sa.Uuid(), nullable=False),
@@ -52,17 +72,18 @@ def upgrade() -> None:
     sa.Column('active', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('last_used_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['tenant_id'], ['tenant.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['tenant_id'], ['pass_builder.tenant.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_api_client_tenant_id'), 'api_client', ['tenant_id'], unique=False)
-    op.create_index(op.f('ix_api_client_token_hash'), 'api_client', ['token_hash'], unique=True)
+    op.create_index(op.f('ix_api_client_tenant_id'), 'api_client', ['tenant_id'], unique=False, schema=SCHEMA)
+    op.create_index(op.f('ix_api_client_token_hash'), 'api_client', ['token_hash'], unique=True, schema=SCHEMA)
     op.create_table('credential_set',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('tenant_id', sa.Uuid(), nullable=False),
-    sa.Column('provider', sa.Enum('apple', 'google', name='provider'), nullable=False),
+    sa.Column('provider', sa.Enum('apple', 'google', name='provider', schema=SCHEMA), nullable=False),
     sa.Column('label', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('status', sa.Enum('key_pending', 'active', 'expired', 'revoked', 'superseded', name='credential_status'), nullable=False),
+    sa.Column('status', sa.Enum('key_pending', 'active', 'expired', 'revoked', 'superseded', name='credential_status', schema=SCHEMA), nullable=False),
     sa.Column('predecessor_id', sa.Uuid(), nullable=True),
     sa.Column('pass_type_identifier', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('team_identifier', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -81,11 +102,12 @@ def upgrade() -> None:
     sa.Column('csr_pem', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['predecessor_id'], ['credential_set.id'], ),
-    sa.ForeignKeyConstraint(['tenant_id'], ['tenant.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['predecessor_id'], ['pass_builder.credential_set.id'], ),
+    sa.ForeignKeyConstraint(['tenant_id'], ['pass_builder.tenant.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_credential_set_tenant_id'), 'credential_set', ['tenant_id'], unique=False)
+    op.create_index(op.f('ix_credential_set_tenant_id'), 'credential_set', ['tenant_id'], unique=False, schema=SCHEMA)
     op.create_table('template',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('tenant_id', sa.Uuid(), nullable=False),
@@ -94,28 +116,30 @@ def upgrade() -> None:
     sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('archived_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['tenant_id'], ['tenant.id'], ),
+    sa.ForeignKeyConstraint(['tenant_id'], ['pass_builder.tenant.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('tenant_id', 'key')
+    sa.UniqueConstraint('tenant_id', 'key'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_template_tenant_id'), 'template', ['tenant_id'], unique=False)
+    op.create_index(op.f('ix_template_tenant_id'), 'template', ['tenant_id'], unique=False, schema=SCHEMA)
     op.create_table('secret_blob',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('credential_set_id', sa.Uuid(), nullable=False),
-    sa.Column('kind', sa.Enum('private_key', 'service_account_json', name='secret_kind'), nullable=False),
+    sa.Column('kind', sa.Enum('private_key', 'service_account_json', name='secret_kind', schema=SCHEMA), nullable=False),
     sa.Column('ciphertext', sa.LargeBinary(), nullable=False),
     sa.Column('nonce', sa.LargeBinary(), nullable=False),
     sa.Column('wrapped_dek', sa.LargeBinary(), nullable=False),
     sa.Column('algo', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['credential_set_id'], ['credential_set.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['credential_set_id'], ['pass_builder.credential_set.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_secret_blob_credential_set_id'), 'secret_blob', ['credential_set_id'], unique=False)
+    op.create_index(op.f('ix_secret_blob_credential_set_id'), 'secret_blob', ['credential_set_id'], unique=False, schema=SCHEMA)
     op.create_table('template_variant',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('template_id', sa.Uuid(), nullable=False),
-    sa.Column('wallet_type', sa.Enum('apple', 'google', 'samsung', name='wallet_type'), nullable=False),
+    sa.Column('wallet_type', sa.Enum('apple', 'google', 'samsung', name='wallet_type', schema=SCHEMA), nullable=False),
     sa.Column('key', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('is_default', sa.Boolean(), nullable=False),
@@ -123,18 +147,19 @@ def upgrade() -> None:
     sa.Column('google_class_id', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('archived_at', sa.DateTime(timezone=True), nullable=True),
-    sa.ForeignKeyConstraint(['credential_set_id'], ['credential_set.id'], ),
-    sa.ForeignKeyConstraint(['template_id'], ['template.id'], ),
+    sa.ForeignKeyConstraint(['credential_set_id'], ['pass_builder.credential_set.id'], ),
+    sa.ForeignKeyConstraint(['template_id'], ['pass_builder.template.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('template_id', 'wallet_type', 'key')
+    sa.UniqueConstraint('template_id', 'wallet_type', 'key'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_template_variant_template_id'), 'template_variant', ['template_id'], unique=False)
-    op.create_index('uq_variant_default', 'template_variant', ['template_id', 'wallet_type'], unique=True, postgresql_where='is_default')
+    op.create_index(op.f('ix_template_variant_template_id'), 'template_variant', ['template_id'], unique=False, schema=SCHEMA)
+    op.create_index('uq_variant_default', 'template_variant', ['template_id', 'wallet_type'], unique=True, postgresql_where='is_default', schema=SCHEMA)
     op.create_table('template_version',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('variant_id', sa.Uuid(), nullable=False),
     sa.Column('number', sa.Integer(), nullable=False),
-    sa.Column('status', sa.Enum('draft', 'published', 'archived', name='version_status'), nullable=False),
+    sa.Column('status', sa.Enum('draft', 'published', 'archived', name='version_status', schema=SCHEMA), nullable=False),
     sa.Column('pass_json', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('class_json', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('object_json', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
@@ -147,13 +172,14 @@ def upgrade() -> None:
     sa.Column('created_by', sa.Uuid(), nullable=True),
     sa.Column('published_at', sa.DateTime(timezone=True), nullable=True),
     sa.CheckConstraint('pass_json IS NOT NULL OR (class_json IS NOT NULL AND object_json IS NOT NULL)', name='ck_template_version_platform_payload'),
-    sa.ForeignKeyConstraint(['created_by'], ['api_client.id'], ),
-    sa.ForeignKeyConstraint(['variant_id'], ['template_variant.id'], ),
+    sa.ForeignKeyConstraint(['created_by'], ['pass_builder.api_client.id'], ),
+    sa.ForeignKeyConstraint(['variant_id'], ['pass_builder.template_variant.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('variant_id', 'number')
+    sa.UniqueConstraint('variant_id', 'number'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_template_version_variant_id'), 'template_version', ['variant_id'], unique=False)
-    op.create_index('uq_version_published', 'template_version', ['variant_id'], unique=True, postgresql_where="status = 'published'")
+    op.create_index(op.f('ix_template_version_variant_id'), 'template_version', ['variant_id'], unique=False, schema=SCHEMA)
+    op.create_index('uq_version_published', 'template_version', ['variant_id'], unique=True, postgresql_where="status = 'published'", schema=SCHEMA)
     op.create_table('audit_log',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('tenant_id', sa.Uuid(), nullable=False),
@@ -167,36 +193,38 @@ def upgrade() -> None:
     sa.Column('template_id', sa.Uuid(), nullable=True),
     sa.Column('variant_id', sa.Uuid(), nullable=True),
     sa.Column('version_id', sa.Uuid(), nullable=True),
-    sa.Column('wallet_type', sa.Enum('apple', 'google', 'samsung', name='wallet_type'), nullable=True),
+    sa.Column('wallet_type', sa.Enum('apple', 'google', 'samsung', name='wallet_type', schema=SCHEMA), nullable=True),
     sa.Column('subject_ref', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('requested_fields', sa.ARRAY(sa.String()), nullable=True),
     sa.Column('details', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-    sa.ForeignKeyConstraint(['actor_client_id'], ['api_client.id'], ),
-    sa.ForeignKeyConstraint(['template_id'], ['template.id'], ),
-    sa.ForeignKeyConstraint(['tenant_id'], ['tenant.id'], ),
-    sa.ForeignKeyConstraint(['variant_id'], ['template_variant.id'], ),
-    sa.ForeignKeyConstraint(['version_id'], ['template_version.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['actor_client_id'], ['pass_builder.api_client.id'], ),
+    sa.ForeignKeyConstraint(['template_id'], ['pass_builder.template.id'], ),
+    sa.ForeignKeyConstraint(['tenant_id'], ['pass_builder.tenant.id'], ),
+    sa.ForeignKeyConstraint(['variant_id'], ['pass_builder.template_variant.id'], ),
+    sa.ForeignKeyConstraint(['version_id'], ['pass_builder.template_version.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_audit_log_request_id'), 'audit_log', ['request_id'], unique=False)
-    op.create_index(op.f('ix_audit_log_tenant_id'), 'audit_log', ['tenant_id'], unique=False)
-    op.create_index(op.f('ix_audit_log_ts'), 'audit_log', ['ts'], unique=False)
+    op.create_index(op.f('ix_audit_log_request_id'), 'audit_log', ['request_id'], unique=False, schema=SCHEMA)
+    op.create_index(op.f('ix_audit_log_tenant_id'), 'audit_log', ['tenant_id'], unique=False, schema=SCHEMA)
+    op.create_index(op.f('ix_audit_log_ts'), 'audit_log', ['ts'], unique=False, schema=SCHEMA)
     op.create_table('mapping_rule',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('version_id', sa.Uuid(), nullable=False),
-    sa.Column('origin', sa.Enum('authored', 'derived', name='rule_origin'), nullable=False),
-    sa.Column('target_kind', sa.Enum('field_value', 'field_label', 'barcode_message', 'barcode_alt_text', 'image', 'nfc_payload', 'json_pointer', name='target_kind'), nullable=False),
+    sa.Column('origin', sa.Enum('authored', 'derived', name='rule_origin', schema=SCHEMA), nullable=False),
+    sa.Column('target_kind', sa.Enum('field_value', 'field_label', 'barcode_message', 'barcode_alt_text', 'image', 'nfc_payload', 'json_pointer', name='target_kind', schema=SCHEMA), nullable=False),
     sa.Column('target', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('source_field', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('value_type', sa.Enum('text', 'date', 'number', 'boolean', 'image', 'uri', name='value_type'), nullable=False),
+    sa.Column('value_type', sa.Enum('text', 'date', 'number', 'boolean', 'image', 'uri', name='value_type', schema=SCHEMA), nullable=False),
     sa.Column('required', sa.Boolean(), nullable=False),
     sa.Column('default_value', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.Column('position', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['version_id'], ['template_version.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['version_id'], ['pass_builder.template_version.id'], ),
+    sa.PrimaryKeyConstraint('id'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_mapping_rule_version_id'), 'mapping_rule', ['version_id'], unique=False)
+    op.create_index(op.f('ix_mapping_rule_version_id'), 'mapping_rule', ['version_id'], unique=False, schema=SCHEMA)
     op.create_table('template_asset',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('version_id', sa.Uuid(), nullable=False),
@@ -206,44 +234,45 @@ def upgrade() -> None:
     sa.Column('sha256', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('object_key', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['version_id'], ['template_version.id'], ),
+    sa.ForeignKeyConstraint(['version_id'], ['pass_builder.template_version.id'], ),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('version_id', 'filename')
+    sa.UniqueConstraint('version_id', 'filename'),
+    schema=SCHEMA,
     )
-    op.create_index(op.f('ix_template_asset_version_id'), 'template_asset', ['version_id'], unique=False)
+    op.create_index(op.f('ix_template_asset_version_id'), 'template_asset', ['version_id'], unique=False, schema=SCHEMA)
     # ### end Alembic commands ###
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # ### commands auto generated by Alembic - please adjust! ###
-    op.drop_index(op.f('ix_template_asset_version_id'), table_name='template_asset')
-    op.drop_table('template_asset')
-    op.drop_index(op.f('ix_mapping_rule_version_id'), table_name='mapping_rule')
-    op.drop_table('mapping_rule')
-    op.drop_index(op.f('ix_audit_log_ts'), table_name='audit_log')
-    op.drop_index(op.f('ix_audit_log_tenant_id'), table_name='audit_log')
-    op.drop_index(op.f('ix_audit_log_request_id'), table_name='audit_log')
-    op.drop_table('audit_log')
-    op.drop_index('uq_version_published', table_name='template_version', postgresql_where="status = 'published'")
-    op.drop_index(op.f('ix_template_version_variant_id'), table_name='template_version')
-    op.drop_table('template_version')
-    op.drop_index('uq_variant_default', table_name='template_variant', postgresql_where='is_default')
-    op.drop_index(op.f('ix_template_variant_template_id'), table_name='template_variant')
-    op.drop_table('template_variant')
-    op.drop_index(op.f('ix_secret_blob_credential_set_id'), table_name='secret_blob')
-    op.drop_table('secret_blob')
-    op.drop_index(op.f('ix_template_tenant_id'), table_name='template')
-    op.drop_table('template')
-    op.drop_index(op.f('ix_credential_set_tenant_id'), table_name='credential_set')
-    op.drop_table('credential_set')
-    op.drop_index(op.f('ix_api_client_token_hash'), table_name='api_client')
-    op.drop_index(op.f('ix_api_client_tenant_id'), table_name='api_client')
-    op.drop_table('api_client')
-    op.drop_index(op.f('ix_tenant_key'), table_name='tenant')
-    op.drop_table('tenant')
-    op.drop_index(op.f('ix_data_field_key'), table_name='data_field')
-    op.drop_table('data_field')
+    op.drop_index(op.f('ix_template_asset_version_id'), table_name='template_asset', schema=SCHEMA)
+    op.drop_table('template_asset', schema=SCHEMA)
+    op.drop_index(op.f('ix_mapping_rule_version_id'), table_name='mapping_rule', schema=SCHEMA)
+    op.drop_table('mapping_rule', schema=SCHEMA)
+    op.drop_index(op.f('ix_audit_log_ts'), table_name='audit_log', schema=SCHEMA)
+    op.drop_index(op.f('ix_audit_log_tenant_id'), table_name='audit_log', schema=SCHEMA)
+    op.drop_index(op.f('ix_audit_log_request_id'), table_name='audit_log', schema=SCHEMA)
+    op.drop_table('audit_log', schema=SCHEMA)
+    op.drop_index('uq_version_published', table_name='template_version', postgresql_where="status = 'published'", schema=SCHEMA)
+    op.drop_index(op.f('ix_template_version_variant_id'), table_name='template_version', schema=SCHEMA)
+    op.drop_table('template_version', schema=SCHEMA)
+    op.drop_index('uq_variant_default', table_name='template_variant', postgresql_where='is_default', schema=SCHEMA)
+    op.drop_index(op.f('ix_template_variant_template_id'), table_name='template_variant', schema=SCHEMA)
+    op.drop_table('template_variant', schema=SCHEMA)
+    op.drop_index(op.f('ix_secret_blob_credential_set_id'), table_name='secret_blob', schema=SCHEMA)
+    op.drop_table('secret_blob', schema=SCHEMA)
+    op.drop_index(op.f('ix_template_tenant_id'), table_name='template', schema=SCHEMA)
+    op.drop_table('template', schema=SCHEMA)
+    op.drop_index(op.f('ix_credential_set_tenant_id'), table_name='credential_set', schema=SCHEMA)
+    op.drop_table('credential_set', schema=SCHEMA)
+    op.drop_index(op.f('ix_api_client_token_hash'), table_name='api_client', schema=SCHEMA)
+    op.drop_index(op.f('ix_api_client_tenant_id'), table_name='api_client', schema=SCHEMA)
+    op.drop_table('api_client', schema=SCHEMA)
+    op.drop_index(op.f('ix_tenant_key'), table_name='tenant', schema=SCHEMA)
+    op.drop_table('tenant', schema=SCHEMA)
+    op.drop_index(op.f('ix_data_field_key'), table_name='data_field', schema=SCHEMA)
+    op.drop_table('data_field', schema=SCHEMA)
     # ### end Alembic commands ###
 
     # Autogenerate does not pair `op.drop_table()` with a matching enum type
@@ -263,4 +292,4 @@ def downgrade() -> None:
         "target_kind",
         "value_type",
     ):
-        sa.Enum(name=enum_name).drop(bind, checkfirst=True)
+        sa.Enum(name=enum_name, schema=SCHEMA).drop(bind, checkfirst=True)
