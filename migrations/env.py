@@ -188,6 +188,21 @@ async def run_async_migrations() -> None:
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
+        # OHNE DIESES COMMIT LAEUFT JEDE MIGRATION UND WIRD ZURUECKGEROLLT.
+        #
+        # `connect()` committet in SQLAlchemy 2.0 nicht von selbst, und Alembic
+        # uebernimmt es hier nicht: `reflection_search_path` setzt `search_path`,
+        # BEVOR `context.begin_transaction()` drankommt, und oeffnet damit schon
+        # eine Transaktion. Alembic sieht eine laufende Transaktion, haelt sie fuer
+        # fremdverwaltet und gibt einen No-op-Kontext zurueck -- das Commit ist damit
+        # Sache des Aufrufers.
+        #
+        # Der Lauf meldet trotzdem "Running upgrade 0006 -> 0007" und endet mit 0.
+        # Am 2026-09-13 gemessen: Danach stand die Versionstabelle unveraendert auf
+        # 0006, und keine einzige Spalte war angelegt. Das ist die offen gebliebene
+        # Frage aus dem lrz_cc-Deskriptor vom 2026-09-03 -- "das Schema pass_builder
+        # gab es trotzdem nicht" -- und ihre Antwort.
+        await connection.commit()
 
     await connectable.dispose()
 

@@ -13,12 +13,18 @@ server default would silently pin every cached field to one named view. `None` m
 the deployment default, so a row written before this column existed keeps meaning
 exactly what it meant.
 
-THE UNIQUE CONSTRAINT MOVES from `key` to `(view_type, key)`. The same key may
-honestly appear in more than one view, and under the old constraint the second one
-could not be cached at all. Postgres treats NULLs as distinct here, so two rows with
-`view_type IS NULL` and the same key would both be accepted; in practice there are
-none, because `refresh_catalogue` deletes the rows of the view it is refreshing
-before it writes.
+THE UNIQUENESS MOVES from `key` to `(view_type, key)`. The same key may honestly
+appear in more than one view, and under the old one the second could not be cached
+at all. Postgres treats NULLs as distinct here, so two rows with `view_type IS NULL`
+and the same key would both be accepted; in practice there are none, because
+`refresh_catalogue` deletes the rows of the view it is refreshing before it writes.
+
+AND THE OLD UNIQUENESS IS AN INDEX, NOT A CONSTRAINT -- which the first version of
+this migration got wrong. `0001_initial` creates it as
+`create_index(..., ["key"], unique=True)`, so it lives in `pg_index` and never
+appears in `pg_constraint`. Dropping constraint names alone did nothing, left the
+unique index standing and reported success. Corrected on 2026-09-13, after measuring
+it against the production database.
 
 NOTHING IS BACKFILLED, and nothing has to be. `data_field` is a pure cache that
 `POST /fields/refresh` rewrites, and that endpoint now walks every view in use.
@@ -38,14 +44,26 @@ down_revision: str | Sequence[str] | None = "0006"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-#: Wie die alte Eindeutigkeit auf `key` allein geheissen hat.
+#: WO DIE ALTE EINDEUTIGKEIT WIRKLICH LIEGT: in einem UNIQUE INDEX, nicht in einer
+#: Constraint.
 #:
-#: NICHT `data_field_key_key`. Die Metadata dieses Pakets traegt eine
-#: Namenskonvention (`models/base.py`: `uq_%(table_name)s_%(column_0_name)s`), also
-#: heisst sie `uq_data_field_key` -- der Postgres-Vorgabename kommt hier nie zustande.
-#: Ein `DROP ... IF EXISTS data_field_key_key` haette schweigend nichts getan und die
-#: alte Eindeutigkeit stehen gelassen: derselbe Schluessel in zwei Views waere weiter
-#: unmoeglich, und die Migration haette gruen gemeldet.
+#: `0001_initial.py` legt sie als
+#: `op.create_index(op.f("ix_data_field_key"), "data_field", ["key"], unique=True)`
+#: an, und SQLModels `Field(index=True, unique=True)` erzeugt dasselbe. In
+#: `pg_constraint` steht so etwas NICHT -- nur in `pg_index`.
+#:
+#: Die erste Fassung dieser Migration suchte ausschliesslich in `pg_constraint`. Sie
+#: loeschte damit zwei Constraints, die es nie gab, liess den Unique-Index stehen und
+#: meldete gruen: derselbe Schluessel in zwei Views blieb unmoeglich, und niemand
+#: haette es gesehen, bevor das zweite View sich nicht cachen laesst. Am 2026-09-13
+#: an der Produktionsdatenbank gemessen und hier nachgezogen.
+_ALT_INDEX = "ix_data_field_key"
+
+#: Namen, unter denen die alte Eindeutigkeit als CONSTRAINT auftreten koennte. Beide
+#: mitgenommen, weil es billig ist: `uq_data_field_key` aus der Namenskonvention in
+#: `models/base.py`, `data_field_key_key` als Postgres-Vorgabe einer Datenbank, die
+#: vor der Konvention entstand. In den Datenbanken, die wir kennen, trifft keiner von
+#: beiden -- der Unique-Index oben ist der wirkliche Fall.
 _ALT = "uq_data_field_key"
 
 #: Der Vorgabename, den eine Datenbank tragen kann, die VOR der Konvention entstand.
@@ -71,9 +89,20 @@ def upgrade() -> None:
         op.execute(
             f"ALTER TABLE pass_builder.data_field DROP CONSTRAINT IF EXISTS {name}"
         )
-    # EINE DER BEIDEN MUSSTE TREFFEN. Bleibt eine Eindeutigkeit auf `key` allein
-    # stehen, ist die Migration wirkungslos -- und ohne diese Pruefung faellt das
-    # erst auf, wenn das zweite View sich nicht cachen laesst.
+    # DER WIRKLICHE FALL: der Unique-Index aus 0001. Er faellt und entsteht sofort
+    # wieder -- ohne Eindeutigkeit, denn das Modell fuehrt `key` weiterhin als
+    # `Field(index=True)`. Ein blosses Loeschen wuerde den Index verlieren, den
+    # `edutap-dbdef` in der Produktion eine Zeile spaeter ohnehin anlegt; die beiden
+    # Wege muessen dasselbe Schema ergeben.
+    op.execute(f"DROP INDEX IF EXISTS pass_builder.{_ALT_INDEX}")
+    op.create_index(
+        _ALT_INDEX, "data_field", ["key"], unique=False, schema="pass_builder"
+    )
+    # BEIDE KATALOGE, nicht nur einer. Bleibt irgendeine Eindeutigkeit auf `key`
+    # allein stehen -- als Constraint ODER als Index --, ist die Migration
+    # wirkungslos, und ohne diese Pruefung faellt das erst auf, wenn das zweite View
+    # sich nicht cachen laesst. Genau daran ist die erste Fassung vorbeigelaufen: Sie
+    # fragte nur `pg_constraint` und meldete gruen, waehrend der Unique-INDEX stand.
     op.execute(
         """
         DO $$
@@ -87,10 +116,19 @@ def upgrade() -> None:
                AND c.contype = 'u'
                AND cardinality(c.conkey) = 1
                AND a.attname = 'key'
+          ) OR EXISTS (
+            SELECT 1
+              FROM pg_index i
+              JOIN pg_attribute a
+                ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+             WHERE i.indrelid = 'pass_builder.data_field'::regclass
+               AND i.indisunique
+               AND i.indnatts = 1
+               AND a.attname = 'key'
           ) THEN
             RAISE EXCEPTION
               'data_field traegt noch eine Eindeutigkeit auf key allein -- '
-              'der Name in 0007 passt nicht zu dieser Datenbank';
+              'als Constraint oder als Unique-Index. 0007 ist wirkungslos geblieben.';
           END IF;
         END $$;
         """
@@ -115,4 +153,10 @@ def downgrade() -> None:
     # naechste Refresh baut ihn wieder auf.
     op.execute("DELETE FROM pass_builder.data_field WHERE view_type IS NOT NULL")
     op.drop_column("data_field", "view_type", schema="pass_builder")
-    op.create_unique_constraint(_ALT, "data_field", ["key"], schema="pass_builder")
+    # Zurueck in die Form, die 0001 angelegt hat: ein UNIQUE INDEX, keine Constraint.
+    # Eine Constraint hier haette 0001 nicht rueckgaengig gemacht, sondern etwas
+    # anderes hergestellt -- und das naechste `drop_index` haette sie nicht gefunden.
+    op.execute(f"DROP INDEX IF EXISTS pass_builder.{_ALT_INDEX}")
+    op.create_index(
+        _ALT_INDEX, "data_field", ["key"], unique=True, schema="pass_builder"
+    )
