@@ -7,6 +7,7 @@ modification of a `published` version -- mappings or assets -- must yield
 
 from uuid import UUID
 
+from edutap.wallet_google.registry import lookup_model_by_name
 from sqlalchemy import select
 
 from edutap.pass_builder.app import API_PREFIX
@@ -465,7 +466,7 @@ async def test_publish_failure_is_audited_as_error(client, session):
 
 
 class FakeGoogleApi:
-    """Records `Class` push calls instead of hitting the network.
+    """Records `GenericClass` push calls instead of hitting the network.
 
     Same shape as `tests/services/test_render.py`'s `FakeGoogleApi`, kept
     local here since router tests wire it in through a dependency override
@@ -476,6 +477,9 @@ class FakeGoogleApi:
         self.created: list[tuple[dict, dict | None]] = []
 
     def new(self, name: str, data: dict) -> dict:
+        # The real registry decides which names exist: a fake that accepted
+        # any string let `sync` ship with a model name that 500s in production.
+        lookup_model_by_name(name)
         return {"__model_name__": name, **data}
 
     async def acreate(self, data: dict, *, credentials: dict | None = None) -> dict:

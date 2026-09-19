@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from edutap.wallet_google.exceptions import ObjectAlreadyExistsException
+from edutap.wallet_google.registry import lookup_model_by_name
 from sqlalchemy import select
 from tests.dbschema import create_schema_and_tables
 
@@ -89,6 +90,9 @@ class FakeGoogleApi:
         self._conflict_on_create = conflict_on_create
 
     def new(self, name: str, data: dict[str, Any]) -> dict[str, Any]:
+        # The real registry decides which names exist: a fake that accepted
+        # any string let `sync` ship with a model name that 500s in production.
+        lookup_model_by_name(name)
         return {"__model_name__": name, **data}
 
     async def acreate(self, data: Any, *, credentials: dict | None = None) -> Any:

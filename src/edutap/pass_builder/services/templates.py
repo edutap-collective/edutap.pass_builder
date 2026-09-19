@@ -38,7 +38,10 @@ from ..models.enums import (
 )
 from .mapping_validation import validate_mapping_rules
 
-_GOOGLE_CLASS_MODEL = "Class"
+#: The `edutap.wallet_google` registry name of the class `sync_variant` pushes. It
+#: must be a registered name -- `"Class"` was not, and every sync answered 500 -- and
+#: it must match `_GOOGLE_OBJECT_MODEL` in `render.py`, whose objects point at it.
+_GOOGLE_CLASS_MODEL = "GenericClass"
 
 _TOOLING_JSON = "tooling.json"
 _PASS_JSON = "pass.json"  # noqa: S105 - a filename, not a credential
